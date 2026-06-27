@@ -85,6 +85,10 @@ def record_event(decision_id: str, ctx: DecisionContext) -> str:
     embedding    = embed_text(ctx.reason_text)
     event_id     = str(uuid.uuid4())
 
+    # Fetch before opening the write connection — DuckDB disallows mixing
+    # read-only and read-write connections to the same file simultaneously.
+    affected_skus = get_affected_skus(ctx.category, ctx.region_group)
+
     conn = get_conn()
     try:
         conn.execute(
@@ -96,11 +100,10 @@ def record_event(decision_id: str, ctx: DecisionContext) -> str:
             [event_id, decision_id, reason_class, ctx.reason_text, json.dumps(embedding)],
         )
 
-        affected_skus = get_affected_skus(ctx.category, ctx.region_group)
         for sku in affected_skus:
             conn.execute(
-                "INSERT INTO event_sku (event_id, product_id, sales_org_id) VALUES (?,?,?)",
-                [event_id, sku["product_id"], sku["sales_org_id"]],
+                "INSERT INTO event_sku (event_id, product_id, sales_org_id, channel_id) VALUES (?,?,?,?)",
+                [event_id, sku["product_id"], sku["sales_org_id"], sku["channel_id"]],
             )
     finally:
         conn.close()

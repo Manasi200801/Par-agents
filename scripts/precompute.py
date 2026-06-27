@@ -21,9 +21,9 @@ print("Caching headline stats...")
 stats = get_headline_stats()
 with open("data/headline_stats.json", "w") as f:
     json.dump(stats, f, indent=2)
-print(f"  MAE machine: {stats['mae_machine']:.1f}, MAE planner: {stats['mae_planner']:.1f}")
-print(f"  Upward overrides help: {stats['upward_pct_helped']:.0%}")
-print(f"  Downward overrides help: {stats['downward_pct_helped']:.0%}")
+print(f"  WAPE machine: {stats['wape_machine']:.1%}, WAPE planner: {stats['wape_planner']:.1%}")
+print(f"  Planners helped (all):         {stats['pct_helped_all']:.0%}")
+print(f"  Planners helped (meaningful):  {stats['pct_helped_meaningful']:.0%}")
 
 print()
 print("Done. Run this before every demo.")
