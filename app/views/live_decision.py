@@ -25,21 +25,21 @@ from compass.contracts import DecisionContext, MemoryContext, ReconcilerOutput, 
 DEFAULT_REASON = "A competitor is rumoured to be exiting the DACH market."
 
 MACHINE_VALUES: dict[str, float] = {
-    "CP-0271": 437.0,
-    "PC-0029": 610.0,
-    "SM-0507": 280.0,
+    "CP-0271": 906.0,
+    "PC-0029": 3157.0,
+    "SM-0507": 2203.0,
 }
 
 DEFAULT_OVERRIDES: dict[str, float] = {
-    "CP-0271": 360.0,
-    "PC-0029": 575.0,
-    "SM-0507": 265.0,
+    "CP-0271": 750.0,
+    "PC-0029": 2700.0,
+    "SM-0507": 1900.0,
 }
 
 PREVIOUS_ACTUALS: dict[str, float] = {
-    "CP-0271": 421.0,
-    "PC-0029": 602.0,
-    "SM-0507": 289.0,
+    "CP-0271": 870.0,
+    "PC-0029": 3094.0,
+    "SM-0507": 2269.0,
 }
 
 UNIT_MARGINS: dict[str, float] = {
@@ -47,6 +47,24 @@ UNIT_MARGINS: dict[str, float] = {
     "PC-0029": 31.0,
     "SM-0507": 18.0,
 }
+
+
+def _get_machine_value(product_id: str, sales_org_id: str, channel_id: str) -> float:
+    """Return live forecast value; try recent months then fall back to the constant."""
+    try:
+        from compass.store import get_live_machine_value
+        today = dt.date.today().replace(day=1)
+        for offset in [1, 0, -1, -2]:
+            month = (today + dt.timedelta(days=32 * offset)).replace(day=1)
+            try:
+                result = get_live_machine_value(product_id, sales_org_id, channel_id, str(month))
+                if result and result.get("machine_value") is not None:
+                    return float(result["machine_value"])
+            except KeyError:
+                continue
+    except Exception:
+        pass
+    return MACHINE_VALUES.get(product_id, 400.0)
 
 DIRECTION_META = {
     "supports_override": (
@@ -701,24 +719,22 @@ def run_pipeline_stub(ctx: DecisionContext) -> ReconcilerOutput:
                 "fva": 3.7,
             },
         ],
-        calibrated_suggestion=402.0,
+        calibrated_suggestion=round(ctx.machine_value * 0.96, 0),
         confidence_level="medium",
     )
 
-    recommended_value = (
-        402.0
-        if ctx.product_id == "CP-0271"
-        else round((ctx.machine_value + ctx.override_value) / 2.0, 1)
-    )
+    recommended_value = round(ctx.machine_value * 0.96, 0)
 
     return ReconcilerOutput(
         recommended_value=recommended_value,
         confidence_level="medium",
         rationale=(
-            "Confirmed demand and the reported market event do not support reducing "
-            "the commitment to the planner's proposed level. Supply can support a value "
-            "near 420 units, while margin exposure and historical decisions favour a "
-            "smaller adjustment. Compass therefore recommends 402 units."
+            f"The market event is real but historical competitor exits in this category "
+            f"have lifted demand, not reduced it. Confirmed orders and supply readiness "
+            f"both support staying close to the model. "
+            f"Compass recommends {recommended_value:.0f} units — a modest 4% haircut "
+            f"from the machine forecast of {ctx.machine_value:.0f}, versus the planner's "
+            f"proposed {ctx.override_value:.0f}."
         ),
         signals_used=[
             demand_signal,
@@ -752,9 +768,10 @@ def _init_state() -> None:
         "selected_product": "CP-0271",
         "selected_sales_org": "SO04",
         "selected_channel": "CH01",
-        "planner_override": 360.0,
-        "override_slider": 360,
-        "override_number": 360.0,
+        "planner_override": 0.0,
+        "override_slider": 0,
+        "override_number": 0.0,
+        "_override_needs_init": True,
         "reason_text": DEFAULT_REASON,
         "decision_maker": "planner_001",
         "pipeline_output": None,
@@ -764,8 +781,8 @@ def _init_state() -> None:
         "decision_saved": False,
         "decision_id": None,
         "final_decision_mode": "Accept Compass recommendation",
-        "final_value": 402.0,
-        "final_custom_value": 402.0,
+        "final_value": 870.0,
+        "final_custom_value": 870.0,
         "reason_class": "competitor_exit",
         "backend_error": None,
     }
@@ -798,14 +815,14 @@ def _sync_from_number() -> None:
 
 
 def _on_product_change() -> None:
-    product_id = st.session_state.selected_product
-    override = DEFAULT_OVERRIDES.get(
-        product_id,
-        MACHINE_VALUES.get(product_id, 400.0),
-    )
-    st.session_state.override_slider = int(round(override))
-    st.session_state.override_number = float(override)
-    st.session_state.planner_override = float(override)
+    product_id   = st.session_state.selected_product
+    sales_org_id = st.session_state.selected_sales_org
+    channel_id   = st.session_state.selected_channel
+    machine = _get_machine_value(product_id, sales_org_id, channel_id)
+    st.session_state.override_slider = int(round(machine))
+    st.session_state.override_number = float(machine)
+    st.session_state.planner_override = float(machine)
+    st.session_state._override_needs_init = False
     _reset_analysis()
 
 
@@ -1252,7 +1269,7 @@ def _render_passport(
 # -----------------------------------------------------------------------------
 # Main page
 # -----------------------------------------------------------------------------
-def render(force_fallback: bool = False) -> None:
+def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
     """Render the complete Compass Live Decision experience."""
     _init_state()
     st.markdown(VIEW_CSS, unsafe_allow_html=True)
@@ -1335,7 +1352,15 @@ def render(force_fallback: bool = False) -> None:
         orgs["sales_org_id"].astype(str) == sales_org_id
     ].iloc[0]
 
-    machine_value = float(MACHINE_VALUES.get(product_id, 400.0))
+    machine_value = _get_machine_value(product_id, sales_org_id, channel_id)
+
+    # First load or product change — start the slider at machine value (neutral position)
+    if st.session_state.get("_override_needs_init", True):
+        st.session_state.override_slider = int(round(machine_value))
+        st.session_state.override_number = float(machine_value)
+        st.session_state.planner_override = float(machine_value)
+        st.session_state._override_needs_init = False
+
     previous_actual = PREVIOUS_ACTUALS.get(product_id)
     unit_margin = UNIT_MARGINS.get(product_id)
 
@@ -1370,10 +1395,12 @@ def render(force_fallback: bool = False) -> None:
     left, right = st.columns([.85, 1.45], gap="large")
 
     with left:
-        planner_plan = float(DEFAULT_OVERRIDES.get(product_id, machine_value))
-        planner_gap = planner_plan - machine_value
+        # DEFAULT_OVERRIDES represents the plan submitted in the *previous* cycle
+        last_cycle_plan = float(DEFAULT_OVERRIDES.get(product_id, machine_value))
+        planner_plan = last_cycle_plan  # kept for backward-compat references below
+        planner_gap = last_cycle_plan - machine_value
         planner_gap_text = (
-            f"{abs(planner_gap):.0f} {'above' if planner_gap > 0 else 'below'} the model"
+            f"{abs(planner_gap):.0f} {'above' if planner_gap > 0 else 'below'} this model"
             if planner_gap != 0
             else "Matches the model"
         )
@@ -1417,7 +1444,7 @@ def render(force_fallback: bool = False) -> None:
 
   <div class="forecast-mini-grid">
     <div class="forecast-mini">
-      <div class="forecast-mini-label">Current plan</div>
+      <div class="forecast-mini-label">Last cycle plan</div>
       <div class="forecast-mini-value planner-tone">{planner_plan:.0f} units</div>
       <div class="forecast-mini-note">{planner_gap_text}</div>
     </div>
@@ -1454,14 +1481,18 @@ def render(force_fallback: bool = False) -> None:
             unsafe_allow_html=True,
         )
 
-        slider_min = max(0, int(machine_value * .60))
-        slider_max = int(machine_value * 1.35)
+        slider_min = max(0, int(machine_value * .50))
+        slider_max = int(machine_value * 1.75)
 
-        # Keep state valid when a newly selected product has a different range.
-        if not slider_min <= int(st.session_state.override_slider) <= slider_max:
-            default_override = int(round(DEFAULT_OVERRIDES.get(product_id, machine_value)))
-            st.session_state.override_slider = default_override
-            st.session_state.override_number = float(default_override)
+        # If the stored value is outside the slider's visual range, clamp only
+        # the slider thumb to the nearest boundary — never touch override_number
+        # or planner_override, so free-typed values above/below the slider range
+        # are preserved and used in the analysis.
+        stored_slider = int(st.session_state.override_slider)
+        if stored_slider < slider_min:
+            st.session_state.override_slider = slider_min
+        elif stored_slider > slider_max:
+            st.session_state.override_slider = slider_max
 
         control_a, control_b = st.columns([1.55, .7])
         with control_a:
@@ -1481,6 +1512,8 @@ def render(force_fallback: bool = False) -> None:
                 on_change=_sync_from_number,
             )
 
+        # override_value comes from the number input, not the slider, so it is
+        # unconstrained — a planner can type any value beyond the slider range.
         override_value = float(st.session_state.override_number)
         st.session_state.planner_override = override_value
         difference_pct = (

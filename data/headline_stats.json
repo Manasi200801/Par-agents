@@ -1,0 +1,16 @@
+{
+  "method": "H+1 full-month comparison; actuals aggregated across channels",
+  "cutoffs": 23,
+  "total_rows": 68126,
+  "exact_override_share": 0.9982385579661216,
+  "meaningful_override_threshold": 0.05,
+  "meaningful_override_share": 0.7566421043360831,
+  "median_abs_meaningful_override_pct": 0.13859556494192188,
+  "downward_share_meaningful": 0.44980309232351057,
+  "pct_helped_all": 0.6136717259196195,
+  "pct_helped_meaningful": 0.6432770093312898,
+  "mae_machine": 2013.3191072424625,
+  "mae_planner": 1574.0618647799665,
+  "wape_machine": 0.19171073153030882,
+  "wape_planner": 0.14988411448806072
+}
