@@ -4,8 +4,10 @@ Uses Claude Haiku: cheap, fast, runs on every override.
 """
 
 import anthropic
+from dotenv import load_dotenv
+load_dotenv()
 
-client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from environment
+client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from .env or environment
 
 TAXONOMY = [
     "promotion",            # campaign, sale, discount event
