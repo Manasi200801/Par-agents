@@ -1481,13 +1481,18 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
             unsafe_allow_html=True,
         )
 
-        slider_min = max(0, int(machine_value * .60))
-        slider_max = int(machine_value * 1.35)
+        slider_min = max(0, int(machine_value * .50))
+        slider_max = int(machine_value * 1.75)
 
-        # Keep state valid when a newly selected product has a different range.
-        if not slider_min <= int(st.session_state.override_slider) <= slider_max:
-            st.session_state.override_slider = int(round(machine_value))
-            st.session_state.override_number = float(machine_value)
+        # If the stored value is outside the slider's visual range, clamp only
+        # the slider thumb to the nearest boundary — never touch override_number
+        # or planner_override, so free-typed values above/below the slider range
+        # are preserved and used in the analysis.
+        stored_slider = int(st.session_state.override_slider)
+        if stored_slider < slider_min:
+            st.session_state.override_slider = slider_min
+        elif stored_slider > slider_max:
+            st.session_state.override_slider = slider_max
 
         control_a, control_b = st.columns([1.55, .7])
         with control_a:
@@ -1507,6 +1512,8 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
                 on_change=_sync_from_number,
             )
 
+        # override_value comes from the number input, not the slider, so it is
+        # unconstrained — a planner can type any value beyond the slider range.
         override_value = float(st.session_state.override_number)
         st.session_state.planner_override = override_value
         difference_pct = (
