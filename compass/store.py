@@ -5,11 +5,13 @@ P2/P3 import from here; do not duplicate any of these functions.
 """
 
 import json
+import os
 import uuid
 import duckdb
 from compass.contracts import DecisionRecord
 
-DB_PATH = "data/compass.duckdb"
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "compass.duckdb")
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 
 def get_conn():
