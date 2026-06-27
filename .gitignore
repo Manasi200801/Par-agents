@@ -1,0 +1,15 @@
+# Raw hackathon datasets
+data/**/*.parquet
+data/**/*.zip
+
+# Python files
+.venv/
+__pycache__/
+*.pyc
+
+# API keys
+.env
+
+# Generated outputs
+outputs/*
+!outputs/.gitkeep
