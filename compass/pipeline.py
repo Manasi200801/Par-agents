@@ -5,6 +5,8 @@ commit_decision() → writes to DB + triggers event fan-out
 """
 
 import uuid
+import json
+import pandas as pd
 from compass.contracts import DecisionContext, DecisionRecord, ReconcilerOutput
 from compass.classifier import classify_reason
 from compass.router     import get_relevant_agents
@@ -15,6 +17,21 @@ import compass.agents.demand     as demand_agent
 import compass.agents.supply     as supply_agent
 import compass.agents.finance    as finance_agent
 import compass.agents.commercial as commercial_agent
+
+def _safe_json(obj):
+    """Recursively convert Timestamps and non-serializable types to strings."""
+    if isinstance(obj, dict):
+        return {k: _safe_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_safe_json(i) for i in obj]
+    if isinstance(obj, (pd.Timestamp,)):
+        return str(obj.date())
+    try:
+        json.dumps(obj)
+        return obj
+    except TypeError:
+        return str(obj)
+
 
 AGENT_MAP = {
     "demand":     demand_agent,
@@ -79,13 +96,13 @@ def commit_decision(
         reason_text      = ctx.reason_text,
         reason_class     = ctx.reason_class or "other",
         decision_maker   = ctx.decision_maker,
-        context_json     = {
+        context_json     = _safe_json({
             "signals": [s.__dict__ for s in reconciler_output.signals_used],
             "memory":  {
                 k: v for k, v in reconciler_output.memory_context.__dict__.items()
                 if k != "similar_past_events"
             },
-        },
+        }),
     )
     write_decision(record)
     record_event(decision_id, ctx)
