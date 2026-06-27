@@ -18,3 +18,12 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Database (generated at runtime, not committed)
+data/compass.duckdb
+data/compass.duckdb.wal
+
+# Large parquet source data
+data/alpine-manufacturing-forecast/
+data/alpine-manufacturing-gmbh/
+data/firn-outdoor-ag/

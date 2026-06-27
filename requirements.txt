@@ -1,0 +1,9 @@
+anthropic
+fastapi
+uvicorn[standard]
+pandas
+pyarrow
+duckdb
+sentence-transformers
+numpy
+python-dotenv
