@@ -13,6 +13,10 @@ Set PIPELINE_URL=http://localhost:8000 in web/.env.local to connect the UI.
 Deploy on Railway / Render: point start command at this file.
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import datetime
 import dataclasses
 import json
