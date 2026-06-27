@@ -301,6 +301,31 @@ LIGHT_VIEW_OVERRIDES = """
     }
     .mode-pill.live { color: #059669 !important; border-color: rgba(5,150,105,.32) !important; }
     .mode-pill.fallback { color: #b45309 !important; border-color: rgba(180,83,9,.32) !important; }
+    .story-banner {
+        background:
+            radial-gradient(circle at 96% 0%, rgba(8,145,178,.07), transparent 42%),
+            linear-gradient(145deg, #ffffff, #eef6fd) !important;
+        border-color: rgba(8,145,178,.22) !important;
+        box-shadow: 0 6px 22px rgba(0,0,0,.06) !important;
+    }
+    .story-line { color: #29405a !important; }
+    .story-line strong { color: #0d1b2e !important; }
+    .story-foot { color: #5a7090 !important; }
+    .consequence {
+        background: rgba(0,0,0,.025) !important;
+        border-color: rgba(99,131,179,.2) !important;
+        color: #3d5570 !important;
+    }
+    .consequence.risk { background: rgba(180,83,9,.06) !important; border-color: rgba(180,83,9,.28) !important; }
+    .consequence.balanced { background: rgba(5,150,105,.06) !important; border-color: rgba(5,150,105,.28) !important; }
+    .consequence strong { color: #0d1b2e !important; }
+    .push-chip { background: rgba(0,0,0,.035) !important; }
+    .push-chip.up { color: #c2560a !important; }
+    .push-chip.down { color: #047857 !important; }
+    .push-chip.steady { color: #0891b2 !important; }
+    .step-title { color:#0d1b2e !important; }
+    .step-sub { color:#4d6278 !important; }
+    .step-num { color:#0B1220 !important; }
 
     /* ── Replay Dashboard view ── */
     .replay-hero {

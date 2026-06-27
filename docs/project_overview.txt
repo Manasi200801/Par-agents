@@ -1,0 +1,771 @@
+COMPASS — THE COMPLETE STORY
+=============================
+A full explanation of the data, the problem, the approach, and every decision made.
+Written 2026-06-28.
+
+================================================================================
+CHAPTER 1: THE COMPANY AND THE PROBLEM
+================================================================================
+
+Alpine Manufacturing GmbH is a fictional industrial equipment company operating
+across Europe. They make physical goods — bearings, precision couplings,
+industrial resins, drill components — the kind of hardware that ends up inside
+other machines. Their products are sold through 18 regional sales organisations
+spread across the EU: DACH (Germany, Austria, Switzerland), BeNeLux, Western EU,
+and so on. Within each sales organisation, they sell through multiple channels —
+CH01, CH02, CH03, CH04 — which represent different customer types or distribution
+routes (key accounts, distributors, wholesale, and so on).
+
+Every month, Alpine needs to answer a very specific question for each product in
+each region: how many units should we commit to produce and ship next month? This
+is called the monthly demand commit, and it is the central decision of the entire
+supply chain.
+
+If you commit too many, you overproduce. Excess stock sits in warehouses tying up
+capital and eventually becomes obsolescence risk. If you commit too few, you can't
+fulfil customer orders. Big customers get angry. Revenue disappears. Either mistake
+costs money.
+
+Alpine has a statistical forecasting system — a machine learning model — that looks
+at historical sales patterns and outputs a predicted demand number for each
+product-organisation-channel combination every month. This number is called the
+machine forecast. It is the system's best guess based purely on the numbers.
+
+But here's the practical problem: the machine doesn't know about the phone call the
+sales rep just had with a key customer. It doesn't know that a competitor is
+rumoured to be exiting the market. It doesn't know that the product just went on
+promotion. It doesn't know there's a stock shortage coming from a supplier. These
+things live in the heads of the demand planners — the human professionals whose job
+is to review the machine forecast and either accept it or adjust it.
+
+When a planner adjusts the forecast number, that adjusted number is called an
+override. The planner writes down a reason — "I heard this competitor is shutting
+down their DACH operations" — and submits their number. The organisation then plans
+production and logistics around that committed number.
+
+The question that kicked off this entire project was: are the human overrides
+actually helping? Are planners making things better or worse when they deviate from
+the machine? And if both happen, when does each happen?
+
+
+================================================================================
+CHAPTER 2: THE DATA
+================================================================================
+
+Before writing a single line of code, we had to understand exactly what data Alpine
+has. The dataset is stored as a collection of parquet files — a compressed,
+column-oriented file format that is fast to query on a laptop without needing a
+running database server.
+
+There are 19 source data tables, plus additional forecast pipeline output files.
+Here is what each one contains and why it matters:
+
+alpine_sales_actuals.parquet
+  The foundation. Contains approximately 2.8 million rows of actual monthly sales
+  transactions across all 600 products, 18 sales organisations, and 4 channels.
+  Each row has: date, product, sales org, channel, quantity sold (in business
+  units), and revenue in euros. This is the ground truth — what actually shipped,
+  what actually sold. When we want to know what a product has been selling recently,
+  we read this file.
+
+alpine_statistical_forecast.parquet
+  The machine-generated demand forecast. Gives the model's prediction for each
+  product-org-channel combination for future months. The "system forecast" number
+  in the UI comes ultimately from this source.
+
+alpine_demand_plan.parquet
+  The historical planner-adjusted demand plan — what planners committed to each
+  month in the past. Distinct from the statistical forecast; it's the human-approved
+  number that the supply chain actually executed against.
+
+alpine_products.parquet
+  A catalogue of all 600 SKUs (Stock Keeping Units — individual product codes).
+  Each product has: product ID, product name, product group, category (e.g.,
+  Bearings, Couplings, Industrial Resins), and business unit. This is how we know
+  that CP-0271 is "Premium Drills Mark II 1" sitting in the Precision Components
+  business unit.
+
+alpine_sales_org.parquet
+  The 18 sales organisation definitions. Each org has an ID (SO04, SO08, etc.) and
+  a region group (DACH, BeNeLux, Western EU, etc.).
+
+alpine_channels.parquet
+  The 4 channel definitions (CH01-CH04). Channels segment how products reach
+  customers.
+
+alpine_customers.parquet
+  Customer-level data including whether a customer is currently flagged as
+  "declining." Used by the Demand agent to spot weakening demand at the account
+  level, which a purely aggregate forecast wouldn't show.
+
+alpine_suppliers.parquet
+  Supplier reliability profiles. Which suppliers serve which products, their
+  historical OTIF (On Time In Full delivery rate), and their risk level.
+
+alpine_stock_on_hand.parquet
+  A series of inventory snapshots: for each product and sales org, how many units
+  were sitting in stock on each snapshot date, and what their combined value was in
+  euros. This tells the Supply agent whether there's a buffer if demand surprises,
+  or whether we're already dangerously lean.
+
+alpine_future_order_book.parquet
+  Confirmed customer orders that have already been placed but not yet fulfilled.
+  These are real demand signals — a customer has already committed to buying. If the
+  order book total significantly exceeds the machine forecast, that's evidence the
+  forecast is too low.
+
+alpine_production_data.parquet
+  Monthly production records: what was planned to be produced vs what actually came
+  off the production line. The "attainment rate" (actual divided by planned) tells
+  the Supply agent whether raising a commit is realistic — if production has been
+  running at 85% of plan for three months, promising more won't help.
+
+alpine_marketing_spends.parquet
+  Marketing campaign activity: which campaigns ran for which product categories in
+  which sales orgs, when, what type (promotion, brand campaign, trade event), and
+  how much was spent. The Commercial agent uses this to spot whether an active
+  campaign might boost demand beyond what the forecast captured.
+
+alpine_business_plan.parquet
+  The annual financial plan: how much revenue and gross margin each business unit
+  is expected to generate per sales org per month. The Finance agent checks whether
+  a planner's override creates a significant deviation from the financial plan — a
+  big downward override in a region that's already behind plan is a different
+  situation from one in a region that's running ahead.
+
+alpine_price_changes.parquet
+  The history of price changes for each product-org-channel: when the list price
+  changed and to what. The Finance and Commercial agents both use this. A recent
+  price increase can explain a volume decline in the machine forecast; a price cut
+  might signal incoming demand uplift.
+
+alpine_purchase_orders.parquet
+  Purchase orders issued to suppliers: expected delivery week, actual delivery
+  week, quantities. This is how the Supply agent computes the OTIF rate — if 40%
+  of orders from a supplier arrived late, raising the commit on a product that
+  depends on that supplier is risky.
+
+alpine_delivery_data.parquet
+  Outbound delivery performance records — what was shipped to customers and when.
+
+alpine_returns.parquet
+  Product return events: how many units were returned, why, and when. The Demand
+  agent checks returns because they signal quality issues, product obsolescence, or
+  overshipment — any of which would support a downward override.
+
+alpine_cost_breakdown.parquet
+  Product-level cost structure: manufacturing cost, logistics cost, overhead
+  allocation. Used by the Finance agent for margin calculations.
+
+alpine_tariff_reference.parquet
+  Import tariff rates by product category and sourcing region over time. If tariffs
+  on a product category have increased, the cost of goods rises, which affects
+  margin and can influence pricing decisions. The Finance agent surfaces this.
+
+alpine_actuals_plan_forecast_monthly.parquet
+  A pre-aggregated monthly mart that brings together actuals, demand plan, and
+  statistical forecast in one flat table. Used for the FVA replay analysis.
+
+Forecast pipeline output files:
+
+live_forecasts.parquet
+  The actual machine forecast numbers at the granular item level for recent months
+  (April-June 2026 in the current dataset). This is what Compass reads to show the
+  "system forecast" number on screen.
+
+meta_data.parquet
+  A mapping from item_id (the forecast system's internal ID) to the business
+  identifiers: product, sales org, channel, category, business unit. This bridge
+  table is how we translate between the forecasting system's world and the
+  commercial world.
+
+final_backtest_forecasts.parquet, final_error_metrics.parquet,
+final_overall_error_metrics.parquet
+  Backtest outputs from the forecasting model: what would the model have predicted
+  at each historical cutoff date, and how far off was it? These power the FVA
+  replay analysis.
+
+In total, the dataset covers 600 products x 18 sales orgs x 4 channels = up to
+43,200 possible item combinations, though not all products are sold in all regions.
+The hierarchy table in Compass's database contains only the combinations that
+actually have live forecasts.
+
+
+================================================================================
+CHAPTER 3: THE FIRST QUESTION — DO OVERRIDES HELP?
+================================================================================
+
+Before building anything, we had to understand the baseline. We ran a Forecast
+Value Added (FVA) analysis on the historical data.
+
+FVA is simple in concept. For each month, you have three numbers: the machine
+forecast, the planner's committed number, and the actual sales that happened. You
+compute two errors:
+  Machine error  = |actual - machine forecast|
+  Planner error  = |actual - planner commit|
+
+If machine error > planner error, the planner's override helped (they got closer to
+reality). If machine error < planner error, the override hurt (the machine was
+closer). FVA = machine error - planner error, so positive FVA means the human added
+value.
+
+We ran this analysis across 23 planning cycles (roughly two years of monthly
+decisions), covering 68,126 item-month observations and 2.8M underlying sales rows.
+
+The results were striking:
+
+Overall, planners improved accuracy by a large margin.
+  Machine MAE:  2,013 units per item-month
+  Planner MAE:  1,574 units per item-month
+  Improvement:  21.8% reduction in absolute error
+  Machine WAPE: 19.2%
+  Planner WAPE: 15.0%
+
+But the improvement was not uniform.
+  Upward overrides (planner commits MORE than machine): helped in 71% of cases
+  Downward overrides (planner commits LESS than machine): hurt in 66% of cases
+
+Most overrides were meaningful.
+  75.7% of override events represented a change of more than 5% from the machine
+  forecast. The median meaningful override was 13.9% away from machine value.
+  45% of meaningful overrides were downward.
+
+What this tells us: human planners have genuine insight that improves forecast
+accuracy overall — but they have a systematic bias toward downward overrides that
+frequently backfire. This creates the core use case for Compass: help planners make
+better-calibrated decisions by confronting them with evidence before they commit,
+and track performance over time so the pattern becomes visible.
+
+
+================================================================================
+CHAPTER 4: THE SOLUTION — COMPASS
+================================================================================
+
+Compass is an AI-assisted decision support tool for demand planners. The key word
+is "support" — the human always makes the final call. Compass's job is to make
+sure the planner has seen every relevant signal before they commit to a number.
+
+The central workflow has five steps:
+
+1. The planner selects a product, sales org, and channel.
+2. They see the machine forecast alongside real historical sales data (recent
+   run-rate, same month last year, stock on hand, value per unit).
+3. They propose a number — their override — and write down why they want to change.
+4. Compass runs a panel of specialist AI agents, each examining the decision from
+   a different angle.
+5. An AI reconciler synthesises all the evidence into a suggestion, the planner
+   reviews it, and commits a final number.
+
+Everything that happens in steps 4 and 5 is recorded in a database. Once actuals
+arrive next month, every decision gets scored — did the final committed number
+improve on the machine forecast? This creates a learning loop: every decision adds
+to the track record, and the next decision benefits from that history.
+
+
+================================================================================
+CHAPTER 5: THE ARCHITECTURE
+================================================================================
+
+The technical stack was chosen for simplicity and speed. There are three layers:
+
+THE DATA LAYER
+  Raw parquet files from the Alpine dataset, read directly by Python via PyArrow.
+  There is no data warehouse, no ETL pipeline. The parquet files are the source of
+  truth, read on demand and cached in memory using Python's @lru_cache. This works
+  because the dataset fits comfortably in RAM on a modern laptop and the parquet
+  format is fast for columnar reads.
+
+  One important technical issue: Alpine's data was exported with dictionary-encoded
+  columns using uint32 indices — a compression technique where strings are stored as
+  integer codes. Standard pd.read_parquet() doesn't handle these correctly and
+  fails. Every loader goes through a custom PyArrow decoder
+  (_decode_dictionary_columns) that casts dictionary columns back to their
+  underlying string type before converting to a pandas DataFrame.
+
+THE DATABASE LAYER
+  A single DuckDB file (compass.duckdb) that stores everything Compass writes: the
+  product-org-channel hierarchy, every committed decision, every event, and computed
+  FVA scores. DuckDB is an in-process SQL engine — it runs embedded inside the
+  Python application, needs no server, and the entire database is one file.
+
+  Why DuckDB instead of PostgreSQL or SQLite?
+  - PostgreSQL requires a running server — overkill for a demo.
+  - SQLite is simpler but lacks columnar storage and analytical query performance.
+  - DuckDB is the sweet spot: SQL interface, no server, analytical speed, small
+    footprint.
+  - Neo4j (graph database) was ruled out entirely — no graph-shaped problem here.
+
+THE APPLICATION LAYER
+  A Streamlit web app (app/main.py). Streamlit is a Python-first UI framework that
+  turns scripts into interactive web pages. It handles state management, reactive
+  re-rendering, and the HTTP server — all in Python. For a data product prototype,
+  it removes weeks of frontend work.
+
+
+================================================================================
+CHAPTER 6: THE FIVE AGENTS — WHY FIVE AND WHAT EACH ONE DOES
+================================================================================
+
+When a planner proposes an override, the fundamental question is: what evidence
+exists in the data that supports or challenges this decision? That evidence comes
+from fundamentally different domains — demand signals, supply constraints, financial
+exposure, market conditions, and historical performance. No single analysis captures
+all of them.
+
+We chose five agents because each one reads a different slice of the data and asks
+a different question:
+
+------------------------------------------------------------
+AGENT 1: DEMAND (THREE SUB-SIGNALS)
+------------------------------------------------------------
+
+The Demand agent reads the future order book, customer data, and returns data.
+It emits up to three signals:
+
+Orders sub-signal:
+  Looks at confirmed customer orders for this product in this sales org. If
+  customers have already placed firm orders for 1,100 units and the machine
+  forecast says 833, that's hard evidence the machine is too low — those orders
+  already exist. Conversely, if the order book is light, that supports a downward
+  override. Direction is set mechanically: if confirmed orders exceed the machine
+  forecast, the signal contradicts a downward override.
+
+Customers sub-signal:
+  Flags declining accounts in this sales org — customers whose purchasing trend has
+  been weakening. This is a signal that the aggregate sales picture is hiding a
+  structural deterioration in the customer base that the historical patterns don't
+  yet capture.
+
+Returns sub-signal:
+  Counts recent return events for this specific SKU. High returns signal quality
+  problems or overshipment — evidence that the product is landing at customers who
+  didn't really need it. This supports a downward view.
+
+Why three sub-signals instead of one?
+  Because the evidence types are genuinely different. Order book evidence is hard
+  (confirmed money on the table). Customer trend evidence is directional (accounts
+  changing behaviour). Returns evidence is a lagging indicator of product-market fit
+  issues. Showing them as three separate cards lets the planner evaluate their
+  quality independently rather than averaging them into one number they can't
+  interrogate.
+
+------------------------------------------------------------
+AGENT 2: SUPPLY AND OPERATIONS
+------------------------------------------------------------
+
+The Supply agent reads stock on hand, purchase orders, and production data.
+It asks: can we actually fulfil whatever number we commit to?
+
+Stock cover signal:
+  Takes the current stock quantity and divides it by the weekly demand rate
+  (machine forecast / 4). If the result is less than 3 weeks of cover, a downward
+  override could leave almost no buffer — if actual demand runs higher than the
+  commit, a stockout happens fast.
+
+Supplier OTIF signal:
+  Looks at historical purchase orders for this product and computes what fraction
+  arrived on time (on-time in full). If OTIF is below 80%, raising the forecast
+  risks committing to a number that the supply chain can't reliably deliver.
+
+Production attainment signal:
+  Checks whether production has been hitting its targets. If a factory has been
+  running at 85% of planned output for three months, the capacity to absorb a
+  higher commit simply may not exist.
+
+The supply agent always emits at least one signal even if all three thresholds
+pass — it will report "stock cover is X weeks, no supply constraint identified."
+This ensures the planner's panel is never silent. An empty panel is confusing;
+a neutral "all clear" is informative.
+
+------------------------------------------------------------
+AGENT 3: FINANCE AND MARGIN
+------------------------------------------------------------
+
+The Finance agent reads the business plan, cost breakdown, tariff reference, and
+price changes. It asks: what is the financial exposure of this override?
+
+Revenue delta signal:
+  Computes the revenue implication of the proposed override. If the planner
+  proposes 500 units instead of 833, and the unit price is €78, that's a €26,000
+  revenue reduction. It then compares this to the monthly business plan revenue for
+  this business unit in this sales org. If the revenue delta exceeds 5% of the
+  plan, the signal fires.
+
+Tariff signal:
+  Tracks whether import tariff rates on this product category have risen by more
+  than 10% relative to the previous assessment. Rising tariffs increase landed cost,
+  which can squeeze margins or force price adjustments.
+
+Why Finance as a separate agent?
+  A planner thinking about units doesn't automatically translate their decision into
+  revenue. Making the financial stakes explicit — "this override reduces estimated
+  revenue by €26k vs. the €320k monthly plan" — changes how a planner frames their
+  decision.
+
+------------------------------------------------------------
+AGENT 4: COMMERCIAL AND MARKET
+------------------------------------------------------------
+
+The Commercial agent reads marketing spend records and price change history.
+It asks: what commercial dynamics are active right now that might shift demand
+away from history?
+
+Campaign signal:
+  If there are active marketing campaigns for this product category in this sales
+  org, they may lift demand beyond what the statistical model captured. A trade
+  fair, a promotional campaign, a key-account push — these are signals the machine
+  didn't know about when it generated its forecast.
+
+Price change signal:
+  If the list price for this product has changed by more than 2% recently, it fires
+  a signal. A price increase often dampens demand. A price cut often stimulates it.
+  The machine's historical patterns were trained on prices that no longer apply.
+
+Why separate from Finance?
+  The Finance agent thinks in margin impact and plan deviation. The Commercial agent
+  thinks in market dynamics — what forces in the external world are acting on this
+  product right now. They ask different questions and produce different evidence.
+
+------------------------------------------------------------
+AGENT 5: MEMORY
+------------------------------------------------------------
+
+This agent is special because it doesn't read Alpine source data. It reads the
+Compass database itself — the record of past decisions.
+
+The Memory agent pulls two things:
+1. The track record of this specific planner: how many decisions have they made,
+   what fraction helped, what was their average FVA.
+2. The track record of this reason class: when planners cited "competitor exit" in
+   the past, how big were the overrides, how big was the actual impact, what
+   fraction helped.
+
+It then produces a calibrated suggestion — a number that the historical track
+record for this reason type would imply. If past "competitor exit" overrides
+averaged +20% but actual realised impacts averaged +13%, the memory agent nudges
+the suggestion toward the more modest number.
+
+Why does this matter?
+  Because planners tend to overreact. The upward override bias found in the FVA
+  analysis follows patterns by reason class. "Competitor exit" consistently produced
+  overrides that overshot the actual demand impact. "Promotion" events produced
+  overrides that often undershot. The memory agent makes this pattern explicit and
+  personal.
+
+Note: there is no memory.py agent file. Memory lookups are simple SQL queries,
+not AI reasoning, so the memory context is assembled in the pipeline directly and
+passed to the reconciler as structured data.
+
+
+================================================================================
+CHAPTER 7: THE RECONCILER — THE SINGLE SYNTHESIS CALL
+================================================================================
+
+Once all five agents have run, Compass has a collection of signals — directional
+evidence with confidence scores and supporting data rows. The reconciler's job is
+to synthesise all of this into a single recommendation.
+
+The reconciler is built on Claude Opus 4.8, currently the most capable model
+Anthropic makes. The choice matters because synthesis is a harder task than
+pattern-matching. The reconciler has to:
+  - Read evidence from five different domains
+  - Understand that some signals contradict each other
+  - Weight signals by their confidence and relevance
+  - Produce a number that balances the evidence
+  - Write 2-4 plain sentences explaining why
+
+The prompt is structured in four sections:
+  1. Decision context (product, machine value, planner's proposed value, reason
+     text, classified reason class)
+  2. Signals from all agents
+  3. Memory and track record summary
+  4. Task instructions and output format (JSON only)
+
+One architectural constraint is enforced by a code comment at the top of the
+reconciler file: this is the only place Opus is called. Never add a second call.
+
+This is a cost discipline decision. Opus is the most expensive Claude model. Every
+planner decision costs one Opus call. If Opus were called inside individual agents
+or for follow-up analysis, the per-decision cost would multiply. The agents run on
+rule-based Python (no model calls at all); only the synthesis step uses AI.
+
+If no API key is configured, the reconciler falls back to a deterministic stub — a
+hardcoded demo response. This means the application works completely without an API
+key, which is essential for a demo that might be shown without internet access or
+before billing is set up.
+
+
+================================================================================
+CHAPTER 8: HOW THE DATA FLOWS — ONE DECISION, START TO FINISH
+================================================================================
+
+Let's trace exactly what happens when a planner opens Compass and commits a
+decision for CP-0271 in SO04 / CH01:
+
+Step 1 — Load the context.
+  Compass reads product metadata from alpine_products.parquet and sales org
+  metadata from alpine_sales_org.parquet. These are cached in session state after
+  the first load.
+
+Step 2 — Get the machine forecast.
+  _get_machine_value() queries live_forecasts.parquet via forecast_metadata.parquet.
+  It tries next month, then current month, then one month back, then two months
+  back — because the live forecast file only covers April-June 2026. It returns
+  both the numeric value AND the specific month it resolved to (e.g., "2026-06-01").
+  This month is then used everywhere: the planning period label, the "same month
+  last year" lookup, and the story headline.
+
+Step 3 — Compute the decision facts.
+  compass/insights.py runs four computations from alpine_sales_actuals.parquet:
+
+  Recent run-rate: the trailing 3-month average of actual monthly sales, with a
+  partial-month trim. If the most recent month looks like a data cutoff (less than
+  45% of the median of prior months), it's dropped to avoid misleading the average.
+
+  Same month last year: the actual sales quantity for June 2025 (the calendar month
+  one year before June 2026), looked up directly from the monthly actuals index.
+
+  Value per unit: the revenue per unit over the trailing 6 months of actuals (total
+  revenue divided by total quantity), reflecting realised price rather than list
+  price.
+
+  Stock position: the most recent stock-on-hand snapshot.
+
+  All these functions are wrapped in @lru_cache — the first call reads the parquet
+  file, subsequent calls return the cached result instantly.
+
+  For CP-0271 / SO04 / CH01: run-rate ~1,241/mo, June 2025 ~1,605, value/unit ~€78,
+  stock ~758 units.
+
+Step 4 — The planner sees the story.
+  The UI builds a headline sentence: "The system forecasts 833 units for Jun 2026
+  — about 33% below the recent run-rate of ~1,241/mo and 48% below last year's
+  1,605. At ~€78/unit that is roughly €65k in sales value."
+  This sentence is generated from the real computed facts, not hardcoded.
+
+Step 5 — The planner proposes a number and writes their reason.
+  They move the slider to, say, 1,100, write "I heard our main competitor is exiting
+  DACH. Expect demand to shift to us." Compass classifies the reason text using
+  keyword matching — this becomes "competitor_exit" as the reason class.
+
+Step 6 — The agent pipeline runs.
+  Each of the five agents is called with a DecisionContext object containing the
+  product, sales org, channel, machine value (833), override value (1,100), reason
+  text, and reason class. Each agent returns a list of Signal objects. Each signal
+  has: agent name, claim text, direction (supports/contradicts/neutral), magnitude
+  (0-1), confidence (0-1), source table name, and evidence rows.
+
+Step 7 — The reconciler synthesises.
+  All signals plus the memory context are formatted into a prompt and sent to Opus
+  4.8. Opus reads: five or more signals, the historical pattern for
+  "competitor_exit" overrides, the planner's personal track record. It responds
+  with JSON: a recommended value, a confidence level, and a rationale paragraph.
+
+Step 8 — The planner reviews the evidence.
+  The UI renders each signal as a card. Each card shows which way the evidence
+  points (Suggests higher demand / Suggests lower demand / Broadly neutral) and the
+  actual data rows the agent used. The planner can expand any card to see the raw
+  evidence table.
+
+Step 9 — The planner commits.
+  They choose: accept the suggestion, keep their own number, or type something
+  different. They click "Confirm and save."
+
+Step 10 — The decision is written to DuckDB.
+  write_decision() records everything: machine value, override value, reconciler
+  value, final committed value, reason text, reason class, planner ID, timestamp.
+  The FVA fields are left null until actuals arrive.
+
+Step 11 — When actuals come in.
+  score_decision(decision_id, actual) is called. It computes four errors (machine,
+  proposed, reconciler, final), sets FVA = machine_error - final_error, and updates
+  the decision record. Now this decision feeds into the track record views for the
+  next planner who uses this reason class.
+
+
+================================================================================
+CHAPTER 9: THE SCORED MEMORY — THE LEARNING LOOP
+================================================================================
+
+The memory system is what separates Compass from a one-shot analysis tool. Every
+committed decision is a data point. Every scored decision teaches the system
+something about human override patterns.
+
+In the DuckDB database, two SQL views are maintained automatically:
+
+track_record_by_reason
+  For each reason class (competitor_exit, promotion, supply_constraint, etc.):
+  how many past decisions used this reason? What fraction improved accuracy? What
+  was the average override percentage? What was the average realised impact
+  percentage? This view updates live as decisions are scored.
+
+track_record_by_planner
+  For each individual planner (identified by name or ID): how many decisions have
+  they made, what fraction were helpful, what was their average FVA?
+
+When the Memory agent runs for a new decision, it queries both views. If a planner
+with 14 past decisions has a 64% helpfulness rate and average FVA of +3.4, that's
+a signal the reconciler factors in. If the reason class is "competitor_exit" and
+past instances show planners consistently over-estimated the demand uplift
+(overriding by +20% when actual impact was +13%), the reconciler knows to discount
+the magnitude somewhat.
+
+The calibrated suggestion — "based on similar past cases, a number near 960 has
+worked well" — comes from applying the reason class's average realised impact to
+the machine forecast. It's not a black-box model; it's a direct lookup of
+historical performance.
+
+
+================================================================================
+CHAPTER 10: WHAT THE PLANNER SEES — THE UI
+================================================================================
+
+The Streamlit app has two views: Live Decision (the main workflow) and Replay
+Dashboard (FVA analysis over historical cycles).
+
+The Live Decision view is structured as four numbered steps:
+
+STEP 1 — Pick what you're planning.
+  Four dropdowns: product (600 options), sales org (18 options), channel (4
+  options), and their name or ID. Changing the product resets the slider to the
+  machine value so the planner always starts from a neutral position.
+
+STEP 2 — Understand the forecast and set your number.
+  Two columns. Left: the "The starting number" card. Shows the machine forecast as
+  a large number, plus four mini-cards: recent monthly sales, same month last year,
+  sales value per unit, and units in stock. Each mini-card has a note: "Forecast is
+  33% below this" so the planner immediately sees the gap. Right: "Your decision"
+  — slider and number input for their proposed override, a consequence preview
+  ("Committing 267 units below the forecast. If demand lands near the forecast,
+  about 267 units (~€21k) of demand could go unmet"), and the reason textarea.
+  Above all of this sits the "What you're looking at" banner — a one-sentence story
+  built from the computed facts.
+
+STEP 3 — See what the checks found.
+  After clicking "Check my decision", the five agent cards appear. A lead line
+  summarises the lean: "4 of 5 checks point to stronger demand than the forecast."
+  Each card shows the agent's finding, a directional chip (up/down/steady), the
+  confidence level, and a link to expand and see the raw data rows. The suggested
+  number appears below with the reasoning paragraph from Opus.
+
+STEP 4 — Confirm and commit.
+  Three radio options: use the suggested number, keep your own number, or type a
+  different one. The final committed number is shown large. Clicking "Confirm and
+  save" writes the decision to DuckDB and shows the Decision Record — a compact
+  card recording all four numbers (forecast, your number, suggested, final), the
+  reason, the planner's name, and a note that the system will score this once real
+  sales arrive.
+
+The Replay Dashboard reads two pre-computed cache files: headline_stats.json (the
+aggregate numbers: MAE improved from 2,013 to 1,574, WAPE improved from 19.2% to
+15.0%, 64.3% of meaningful overrides helped) and replay_chart_cache.parquet (the
+cycle-by-cycle accuracy data for the chart). These files are generated once by the
+setup script and served statically — computing FVA across 2.8M sales rows in real
+time during a demo would be too slow.
+
+
+================================================================================
+CHAPTER 11: THE DESIGN DECISIONS THAT WEREN'T OBVIOUS
+================================================================================
+
+Why the slider starts at the machine value.
+  When the planner opens the page, the slider sits exactly at the machine forecast.
+  This forces the planner to consciously decide to move away from the machine. If
+  the slider defaulted to last month's number or zero, planners would anchor to the
+  wrong baseline. Starting at machine value encodes the question: "given what you
+  know, how much do you want to deviate from this?"
+
+Why the slider is unconstrained in the number input.
+  The slider range is 50-175% of the machine value — a visual guide. But the number
+  input box accepts any value. A planner who needs to type 2,000 when the machine
+  says 400 can do so. The slider thumb clamps to the range boundary visually, but
+  the actual override value comes from the number input and is never clamped. This
+  prevents the slider's visual range from becoming an invisible policy constraint.
+
+Why the consequence box exists.
+  Before Compass, planners committed numbers without seeing the revenue-denominated
+  stake. "267 units below the forecast" is abstract. "~€21k of demand could go
+  unmet" is concrete. The consequence box computes this from the real unit price in
+  the data and renders it every time the slider moves. It is the single most
+  effective piece of UI at making the financial gravity of the decision visceral.
+
+Why insights.py exists as a separate module.
+  All the real-data computations (run-rate, last year, value per unit, stock) live
+  in compass/insights.py, not in the view file. This separation means the view file
+  stays readable and the insight computations are independently testable. The
+  @lru_cache decorator means each computation runs once per product-org-channel
+  combination per session, no matter how many times the UI re-renders.
+
+Why there is no memory.py agent file.
+  The memory context is assembled in the pipeline, which queries store.py for the
+  track records. The memory signal card shown to the planner is a product of the
+  reconciler including memory context in its prompt. Memory lookups are simple SQL
+  queries, not AI reasoning, so they don't need an "agent" wrapper.
+
+Why insights.py drops trailing partial months.
+  The Alpine data has a cutoff date — the dataset was exported on a specific day.
+  The most recent month in the actuals file is likely incomplete. If we averaged in
+  a partial month, the run-rate would be artificially suppressed. The
+  _complete_months() function checks: if the last month's quantity is less than 45%
+  of the median of the preceding months, it looks like a cutoff artifact and gets
+  dropped. The threshold is 45% rather than 50% because genuinely low months (a
+  product that sold half its normal amount due to a one-off event) should not be
+  dropped; only months that look truncated should be.
+
+Why the month-alignment fix was needed.
+  The planning period label originally showed "Jul 2026" (next month), but the
+  live_forecasts.parquet only covers up to June 2026. The _get_machine_value()
+  function resolves the actual model value from June 2026 via an offset loop
+  [+1, 0, -1, -2]. Before the fix, "same month last year" used the label's month
+  (July 2025 ~ 1,051 units) instead of the resolved month (June 2025 ~ 1,605
+  units). The fix: _get_machine_value() now returns a tuple (value, resolved_month)
+  and the resolved month is used everywhere — label, cycle_label, and the
+  target_month argument to _decision_facts(). Result: CP-0271 now shows Jun 2026
+  and "48% below last year" (1,605) instead of "20% below last year" (1,051).
+
+
+================================================================================
+THE COMPLETE PICTURE
+================================================================================
+
+Start to finish, here is what Compass is and why every piece exists:
+
+THE PROBLEM
+  Demand planners override machine forecasts every month, and nobody knows whether
+  those overrides are helping or hurting.
+
+THE FINDING
+  They mostly help (21.8% MAE improvement overall) — but downward overrides hurt
+  66% of the time, and the pattern is predictable by reason type.
+
+THE SOLUTION
+  Put the evidence in front of the planner before they commit, track every decision,
+  and feed the track record back into the next decision.
+
+THE DATA
+  19 source tables covering sales history, inventory, suppliers, customers, orders,
+  production, finance, marketing, pricing — all pre-existing Alpine data.
+
+THE AGENTS
+  Five specialists, each reading a different slice of the data, each asking a
+  different question (What has demand been? Can supply fulfil it? What is the
+  financial stake? What market forces are active? What happened last time this
+  reason was cited?).
+
+THE RECONCILER
+  One Opus call per decision, synthesising all evidence into a plain-English
+  recommendation — not a command, a suggestion.
+
+THE MEMORY
+  A DuckDB database that accumulates every decision and computes FVA once actuals
+  arrive, continuously updating the track record for planners and reason types.
+
+THE UI
+  Four numbered steps, plain language throughout, real numbers from real data,
+  consequence box that makes the financial stakes visceral, Decision Record that
+  becomes the audit trail.
+
+The whole system runs on a laptop, requires no cloud infrastructure beyond an API
+key, and the entire state is one DuckDB file plus a directory of parquet files.
+That simplicity is a feature — it makes the system inspectable, portable, and fast
+to demo.

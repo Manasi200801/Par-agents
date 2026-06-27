@@ -30,27 +30,8 @@ MACHINE_VALUES: dict[str, float] = {
     "SM-0507": 2203.0,
 }
 
-DEFAULT_OVERRIDES: dict[str, float] = {
-    "CP-0271": 750.0,
-    "PC-0029": 2700.0,
-    "SM-0507": 1900.0,
-}
-
-PREVIOUS_ACTUALS: dict[str, float] = {
-    "CP-0271": 870.0,
-    "PC-0029": 3094.0,
-    "SM-0507": 2269.0,
-}
-
-UNIT_MARGINS: dict[str, float] = {
-    "CP-0271": 24.0,
-    "PC-0029": 31.0,
-    "SM-0507": 18.0,
-}
-
-
-def _get_machine_value(product_id: str, sales_org_id: str, channel_id: str) -> float:
-    """Return live forecast value; try recent months then fall back to the constant."""
+def _get_machine_value(product_id: str, sales_org_id: str, channel_id: str) -> tuple[float, str]:
+    """Return (machine_value, resolved_month); try recent months then fall back to the constant."""
     try:
         from compass.store import get_live_machine_value
         today = dt.date.today().replace(day=1)
@@ -59,12 +40,12 @@ def _get_machine_value(product_id: str, sales_org_id: str, channel_id: str) -> f
             try:
                 result = get_live_machine_value(product_id, sales_org_id, channel_id, str(month))
                 if result and result.get("machine_value") is not None:
-                    return float(result["machine_value"])
+                    return float(result["machine_value"]), str(month)
             except KeyError:
                 continue
     except Exception:
         pass
-    return MACHINE_VALUES.get(product_id, 400.0)
+    return MACHINE_VALUES.get(product_id, 400.0), _planning_period()
 
 DIRECTION_META = {
     "supports_override": (
@@ -118,7 +99,7 @@ VIEW_CSS = """
     }
     .eyebrow {
         color: #78DDF7;
-        font-size: .68rem;
+        font-size: .76rem;
         font-weight: 800;
         letter-spacing: .12em;
         text-transform: uppercase;
@@ -132,7 +113,7 @@ VIEW_CSS = """
     }
     .hero-copy, .muted-copy {
         color: #9AA8BC;
-        font-size: .9rem;
+        font-size: 1rem;
         line-height: 1.65;
         max-width: 820px;
     }
@@ -148,17 +129,17 @@ VIEW_CSS = """
         border-radius: 17px;
         box-shadow: 0 14px 35px rgba(0,0,0,.18);
     }
-    .context-box { padding: .78rem .85rem; min-height: 74px; }
+    .context-box { padding: .6rem .7rem; min-height: 60px; }
     .context-label, .value-label {
         color: #7F8DA2;
-        font-size: .63rem;
+        font-size: .74rem;
         font-weight: 750;
         letter-spacing: .08em;
         text-transform: uppercase;
     }
     .context-value {
         color: #E9EEF7;
-        font-size: .82rem;
+        font-size: .95rem;
         font-weight: 700;
         margin-top: .25rem;
         overflow-wrap: anywhere;
@@ -196,7 +177,7 @@ VIEW_CSS = """
     }
     .forecast-heading {
         color: #F4F7FB;
-        font-size: 1rem;
+        font-size: 1.1rem;
         font-weight: 800;
         margin-top: .25rem;
     }
@@ -209,7 +190,7 @@ VIEW_CSS = """
         border-radius: 999px;
         color: #8FE7FA;
         background: rgba(98,216,244,.07);
-        font-size: .62rem;
+        font-size: .72rem;
         font-weight: 800;
         letter-spacing: .05em;
         text-transform: uppercase;
@@ -231,14 +212,14 @@ VIEW_CSS = """
     }
     .forecast-unit {
         color: #9BA9BC;
-        font-size: .78rem;
+        font-size: .9rem;
         font-weight: 700;
         padding-bottom: .45rem;
     }
     .forecast-message {
         color: #B9C4D3;
-        font-size: .78rem;
-        line-height: 1.55;
+        font-size: .92rem;
+        line-height: 1.6;
         margin-bottom: .95rem;
     }
     .forecast-mini-grid {
@@ -256,27 +237,27 @@ VIEW_CSS = """
     }
     .forecast-mini-label {
         color: #7F8DA2;
-        font-size: .58rem;
+        font-size: .72rem;
         font-weight: 800;
         letter-spacing: .07em;
         text-transform: uppercase;
     }
     .forecast-mini-value {
         color: #F3F6FB;
-        font-size: .92rem;
+        font-size: 1.05rem;
         font-weight: 800;
         margin-top: .22rem;
     }
     .forecast-mini-value.planner-tone { color: #FFBD63; }
     .forecast-mini-note {
         color: #8F9DB0;
-        font-size: .62rem;
+        font-size: .76rem;
         margin-top: .14rem;
         line-height: 1.3;
     }
 
-    .card-title { color: #F4F7FB; font-size: 1.05rem; font-weight: 800; margin-top: .3rem; }
-    .card-copy { color: #91A0B5; font-size: .78rem; line-height: 1.55; margin-top: .2rem; }
+    .card-title { color: #F4F7FB; font-size: 1.18rem; font-weight: 800; margin-top: .3rem; }
+    .card-copy { color: #91A0B5; font-size: .92rem; line-height: 1.55; margin-top: .2rem; }
     .big-value { font-size: 3.4rem; font-weight: 850; letter-spacing: -.055em; line-height: 1; }
     .machine { color: #62D8F4; }
     .planner { color: #FFBD63; }
@@ -289,7 +270,7 @@ VIEW_CSS = """
         gap: .35rem;
         padding: .27rem .6rem;
         border-radius: 999px;
-        font-size: .62rem;
+        font-size: .72rem;
         font-weight: 800;
         letter-spacing: .045em;
         text-transform: uppercase;
@@ -367,7 +348,7 @@ VIEW_CSS = """
     .signal-icon.neutral { color: #84B8FF; }
     .signal-name {
         color: #F6F8FC;
-        font-size: 1.02rem;
+        font-size: 1.12rem;
         font-weight: 850;
         margin: .78rem 0 .28rem;
     }
@@ -380,9 +361,9 @@ VIEW_CSS = """
     }
     .signal-claim {
         color: #D6DEE9;
-        font-size: .79rem;
-        line-height: 1.58;
-        min-height: 64px;
+        font-size: .94rem;
+        line-height: 1.62;
+        min-height: 72px;
     }
     .signal-friendly-meta {
         display: flex;
@@ -393,7 +374,7 @@ VIEW_CSS = """
         margin-top: .85rem;
         padding-top: .72rem;
         color: #8E9DB0;
-        font-size: .66rem;
+        font-size: .78rem;
         font-weight: 720;
     }
     .support { color: #55DDA4; border-color: rgba(85,221,164,.32); }
@@ -431,6 +412,72 @@ VIEW_CSS = """
         background: rgba(255,255,255,.022);
         padding: .78rem;
     }
+    .story-banner {
+        position: relative;
+        padding: 1.05rem 1.25rem;
+        margin: .2rem 0 1.05rem;
+        border-radius: 18px;
+        border: 1px solid rgba(120,221,247,.28);
+        background:
+            radial-gradient(circle at 96% 0%, rgba(120,221,247,.14), transparent 42%),
+            linear-gradient(145deg, rgba(17,27,43,.96), rgba(11,16,26,.96));
+        box-shadow: 0 14px 38px rgba(0,0,0,.20);
+    }
+    .story-banner .eyebrow { color: #78DDF7; }
+    .story-line {
+        color: #DCE5F1;
+        font-size: 1.15rem;
+        line-height: 1.6;
+        margin-top: .4rem;
+        font-weight: 500;
+    }
+    .story-line strong { color: #F4F7FB; font-weight: 800; }
+    .story-line .up { color: #FF9E7A; font-weight: 800; }
+    .story-line .down { color: #6FE3B4; font-weight: 800; }
+    .story-foot {
+        color: #8A98AC;
+        font-size: .84rem;
+        margin-top: .55rem;
+    }
+    .consequence {
+        margin: .1rem 0 .85rem;
+        padding: .7rem .8rem;
+        border-radius: 12px;
+        border: 1px solid rgba(148,171,202,.16);
+        background: rgba(255,255,255,.025);
+        color: #B9C4D3;
+        font-size: .88rem;
+        line-height: 1.55;
+    }
+    .consequence.risk { border-color: rgba(255,170,99,.34); background: rgba(255,170,99,.06); }
+    .consequence.balanced { border-color: rgba(85,221,164,.30); background: rgba(85,221,164,.05); }
+    .consequence strong { color: #F1F5FA; }
+    .push-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: .3rem;
+        padding: .18rem .5rem;
+        border-radius: 999px;
+        font-size: .74rem;
+        font-weight: 800;
+        letter-spacing: .03em;
+        border: 1px solid currentColor;
+        background: rgba(255,255,255,.04);
+        margin-bottom: .15rem;
+    }
+    .push-chip.up { color: #FF9E7A; }
+    .push-chip.down { color: #6FE3B4; }
+    .push-chip.steady { color: #84B8FF; }
+    .step-header { display:flex; align-items:flex-start; gap:.7rem; margin:1.6rem 0 .8rem; }
+    .step-num {
+        flex:none; width:32px; height:32px; border-radius:50%;
+        display:inline-flex; align-items:center; justify-content:center;
+        font-size:1rem; font-weight:800; color:#0B1220;
+        background:linear-gradient(135deg,#78DDF7,#B295FF);
+    }
+    .step-text { display:flex; flex-direction:column; }
+    .step-title { font-size:1.4rem; font-weight:800; color:#F4F7FB; line-height:1.15; letter-spacing:-.02em; }
+    .step-sub { font-size:.9rem; color:#9AA8BC; margin-top:.15rem; }
     @media (max-width: 1050px) {
         .context-grid { grid-template-columns: repeat(3, 1fr); }
         .recommendation-grid { grid-template-columns: 1fr 1fr; }
@@ -546,8 +593,7 @@ def run_pipeline_stub(ctx: DecisionContext) -> ReconcilerOutput:
     demand_signal = Signal(
         agent_name="Demand Agent",
         claim=(
-            "Confirmed orders and key-account demand exceed the planner's "
-            "proposed commitment of 360 units."
+            "Confirmed orders and key-account demand exceed your proposed number of 360 units."
         ),
         direction="contradicts_override",
         magnitude=0.82,
@@ -618,7 +664,7 @@ def run_pipeline_stub(ctx: DecisionContext) -> ReconcilerOutput:
                 "estimated_margin_eur": 10488,
             },
             {
-                "scenario": "Planner override",
+                "scenario": "Your number",
                 "units": 360,
                 "estimated_margin_eur": 8640,
             },
@@ -664,7 +710,7 @@ def run_pipeline_stub(ctx: DecisionContext) -> ReconcilerOutput:
         agent_name="Memory and Historical Decisions Agent",
         claim=(
             "Similar competitor-exit decisions historically required smaller forecast "
-            "adjustments than the planner's proposed reduction."
+            "adjustments than the reduction you proposed."
         ),
         direction="contradicts_override",
         magnitude=0.74,
@@ -731,10 +777,10 @@ def run_pipeline_stub(ctx: DecisionContext) -> ReconcilerOutput:
         rationale=(
             f"The market event is real but historical competitor exits in this category "
             f"have lifted demand, not reduced it. Confirmed orders and supply readiness "
-            f"both support staying close to the model. "
+            f"both support staying close to the forecast. "
             f"Compass recommends {recommended_value:.0f} units — a modest 4% haircut "
-            f"from the machine forecast of {ctx.machine_value:.0f}, versus the planner's "
-            f"proposed {ctx.override_value:.0f}."
+            f"from the system forecast of {ctx.machine_value:.0f}, versus your proposed "
+            f"{ctx.override_value:.0f}."
         ),
         signals_used=[
             demand_signal,
@@ -780,7 +826,7 @@ def _init_state() -> None:
         "backend_mode": "pending",
         "decision_saved": False,
         "decision_id": None,
-        "final_decision_mode": "Accept Compass recommendation",
+        "final_decision_mode": "Use the suggested number",
         "final_value": 870.0,
         "final_custom_value": 870.0,
         "reason_class": "competitor_exit",
@@ -818,7 +864,7 @@ def _on_product_change() -> None:
     product_id   = st.session_state.selected_product
     sales_org_id = st.session_state.selected_sales_org
     channel_id   = st.session_state.selected_channel
-    machine = _get_machine_value(product_id, sales_org_id, channel_id)
+    machine, _ = _get_machine_value(product_id, sales_org_id, channel_id)
     st.session_state.override_slider = int(round(machine))
     st.session_state.override_number = float(machine)
     st.session_state.planner_override = float(machine)
@@ -892,6 +938,138 @@ def _display_value(
     if value is None:
         return "Not available"
     return f"{prefix}{value:,.0f}{suffix}"
+
+
+def _money(value: float | None, short: bool = False) -> str:
+    """Format euros; ``short`` renders large numbers as €65k."""
+    if value is None:
+        return "—"
+    if short and abs(value) >= 1000:
+        return f"€{value / 1000:,.0f}k"
+    return f"€{value:,.0f}"
+
+
+def _decision_facts(
+    product_id: str,
+    sales_org_id: str,
+    channel_id: str,
+    machine_value: float,
+    target_month: str,
+) -> dict:
+    """Assemble the real business facts that frame this decision.
+
+    All numbers come from the Alpine dataset via :mod:`compass.insights`. Any
+    field that cannot be computed is left as ``None`` so the UI degrades quietly.
+    """
+    facts: dict[str, Any] = {
+        "value_per_unit": None,
+        "run_rate": None,
+        "run_rate_delta_pct": None,
+        "last_year_qty": None,
+        "last_year_delta_pct": None,
+        "stock_qty": None,
+        "stock_value": None,
+        "stock_as_of": None,
+        "revenue_at_stake": None,
+    }
+    try:
+        from compass import insights
+
+        baseline = insights.demand_baseline(product_id, sales_org_id, channel_id)
+        if baseline:
+            facts["run_rate"] = baseline.get("run_rate")
+            facts["value_per_unit"] = baseline.get("value_per_unit")
+            run_rate = baseline.get("run_rate")
+            if run_rate:
+                facts["run_rate_delta_pct"] = (machine_value - run_rate) / run_rate * 100.0
+
+        last_year = insights.same_month_last_year(
+            product_id, sales_org_id, channel_id, target_month
+        )
+        if last_year:
+            facts["last_year_qty"] = last_year
+            facts["last_year_delta_pct"] = (machine_value - last_year) / last_year * 100.0
+
+        if facts["value_per_unit"] is None:
+            facts["value_per_unit"] = insights.latest_unit_price(
+                product_id, sales_org_id, channel_id
+            )
+
+        stock = insights.stock_position(product_id, sales_org_id)
+        if stock:
+            facts["stock_qty"] = stock.get("qty")
+            facts["stock_value"] = stock.get("value")
+            facts["stock_as_of"] = stock.get("as_of")
+
+        if facts["value_per_unit"]:
+            facts["revenue_at_stake"] = machine_value * facts["value_per_unit"]
+    except Exception:
+        pass
+    return facts
+
+
+def _build_story_line(facts: dict, machine_value: float, cycle_label: str) -> str:
+    """One plain-language sentence framing the whole decision, from real data."""
+    line = f"The system forecasts <strong>{machine_value:,.0f} units</strong> for {cycle_label}"
+
+    comparisons = []
+    run_rate = facts.get("run_rate")
+    run_delta = facts.get("run_rate_delta_pct")
+    if run_rate and run_delta is not None and abs(run_delta) >= 1:
+        word = "below" if run_delta < 0 else "above"
+        comparisons.append(
+            f"about <strong>{abs(run_delta):.0f}% {word}</strong> the recent "
+            f"run-rate of <strong>~{run_rate:,.0f}/mo</strong>"
+        )
+
+    last_year = facts.get("last_year_qty")
+    ly_delta = facts.get("last_year_delta_pct")
+    if last_year and ly_delta is not None and abs(ly_delta) >= 1:
+        word = "below" if ly_delta < 0 else "above"
+        comparisons.append(
+            f"<strong>{abs(ly_delta):.0f}% {word}</strong> last year's "
+            f"<strong>{last_year:,.0f}</strong>"
+        )
+
+    if comparisons:
+        line += " — " + " and ".join(comparisons)
+    line += "."
+
+    revenue = facts.get("revenue_at_stake")
+    vpu = facts.get("value_per_unit")
+    if revenue and vpu:
+        line += (
+            f" At ~<strong>€{vpu:,.0f}</strong>/unit that is roughly "
+            f"<strong>{_money(revenue, short=True)}</strong> in sales value."
+        )
+    return line
+
+
+def _push_direction(
+    signal: Signal,
+    override_value: float,
+    machine_value: float,
+) -> tuple[str, str, str]:
+    """Map an agent signal to the absolute direction it argues for.
+
+    Returns ``(css_class, arrow, label)``. A signal that *supports* the planner
+    backs whichever side of the model the planner has chosen; a signal that
+    *contradicts* the planner pulls the other way. This is what tells the planner
+    "this evidence points to more / less demand" rather than just "agrees".
+    """
+    direction = str(getattr(signal, "direction", "neutral") or "neutral")
+    if direction == "neutral":
+        return ("steady", "→", "Broadly neutral")
+
+    chose_higher = override_value >= machine_value
+    if direction == "supports_override":
+        argues_higher = chose_higher
+    else:  # contradicts_override
+        argues_higher = not chose_higher
+
+    if argues_higher:
+        return ("up", "▲", "Suggests higher demand")
+    return ("down", "▼", "Suggests lower demand")
 
 
 
@@ -1101,12 +1279,33 @@ def _normalise_evidence(rows: Any) -> pd.DataFrame:
 
     return pd.DataFrame({"evidence": [str(rows)]})
 
-def _render_agent_card(signal: Signal) -> None:
+def _step_header(number: int, title: str, subtitle: str) -> None:
+    st.markdown(
+        f'''<div class="step-header">
+            <div class="step-num">{number}</div>
+            <div class="step-text">
+                <div class="step-title">{html.escape(title)}</div>
+                <div class="step-sub">{html.escape(subtitle)}</div>
+            </div>
+        </div>''',
+        unsafe_allow_html=True,
+    )
+
+
+def _render_agent_card(
+    signal: Signal,
+    override_value: float = 0.0,
+    machine_value: float = 0.0,
+) -> None:
     """Render one concise, business-friendly specialist insight card."""
     direction = str(getattr(signal, "direction", "neutral") or "neutral")
     label, css_class, accent, icon, summary = DIRECTION_META.get(
         direction,
         ("Evidence", "neutral", "#6EA8FF", "•", "Useful context"),
+    )
+
+    push_class, push_arrow, push_label = _push_direction(
+        signal, override_value, machine_value
     )
 
     raw_agent_name = str(getattr(signal, "agent_name", "Specialist Agent"))
@@ -1128,7 +1327,7 @@ def _render_agent_card(signal: Signal) -> None:
                 <span class="direction-pill {css_class}">{label}</span>
             </div>
             <div class="signal-name">{agent_name}</div>
-            <div class="signal-summary">{summary}</div>
+            <div><span class="push-chip {push_class}">{push_arrow} {push_label}</span></div>
             <div class="signal-claim">{claim}</div>
             <div class="signal-friendly-meta">
                 <span>{confidence_text}</span>
@@ -1162,7 +1361,7 @@ def _render_agent_card(signal: Signal) -> None:
 
 
 def _render_memory(memory: MemoryContext | None) -> None:
-    with st.expander("Memory and track record", expanded=False):
+    with st.expander("How similar past decisions turned out", expanded=False):
         if memory is None:
             st.info("Cold start: no scored history exists for this decision type yet.")
             return
@@ -1180,18 +1379,18 @@ def _render_memory(memory: MemoryContext | None) -> None:
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Previous decisions", int(_safe_float(planner.get("n_decisions"))))
         c2.metric("Helpful decisions", f"{_safe_float(planner.get('pct_helpful')) * 100:.0f}%")
-        c3.metric("Average planner FVA", f"{_safe_float(planner.get('avg_fva')):.1f}")
+        c3.metric("Avg. accuracy gain", f"{_safe_float(planner.get('avg_fva')):.1f}")
         c4.metric("Memory confidence", str(confidence).title())
 
-        st.markdown("#### Reason-type calibration")
+        st.markdown("#### What usually happens for this kind of reason")
         r1, r2, r3 = st.columns(3)
-        r1.metric("Reason-type average FVA", f"{_safe_float(reason.get('avg_fva')):.1f}")
+        r1.metric("Avg. accuracy gain (this reason)", f"{_safe_float(reason.get('avg_fva')):.1f}")
         r2.metric("Average previous override", f"{_safe_float(reason.get('avg_override_pct')) * 100:.1f}%")
         r3.metric("Average realised impact", f"{_safe_float(reason.get('avg_realized_pct')) * 100:.1f}%")
 
         if suggestion is not None:
             st.success(
-                f"Calibrated suggestion from scored memory: {float(suggestion):.0f} units"
+                f"Based on similar past cases, a number near {float(suggestion):.0f} has worked well."
             )
 
         if similar:
@@ -1208,59 +1407,56 @@ def _render_passport(
     final_value: float,
 ) -> None:
     reason = html.escape(str(ctx.reason_text))
-    reason_class = html.escape(str(st.session_state.reason_class or "Pending"))
-    backend_mode = html.escape(str(st.session_state.backend_mode).title())
+    reason_class = html.escape(str(st.session_state.reason_class or "Pending").replace("_", " "))
     decision_id = html.escape(str(st.session_state.decision_id))
 
     st.html(
         f"""<div class="passport-card">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;">
                 <div>
-                    <div class="eyebrow" style="color:#55DDA4;">Commitment Passport</div>
+                    <div class="eyebrow" style="color:#55DDA4;">Decision record</div>
                     <div style="color:#F4F7FB;font-size:1.45rem;font-weight:850;margin-top:.2rem;">
-                        Human approved
+                        Saved
                     </div>
-                    <div style="margin-top:.28rem;color:#91A0B5;font-size:.76rem;">
+                    <div style="margin-top:.28rem;color:#91A0B5;font-size:.84rem;">
                         {decision_id}
                     </div>
                 </div>
-                <span class="mode-pill live">● Awaiting actuals</span>
+                <span class="mode-pill live">● Waiting for real sales</span>
             </div>
 
             <div class="passport-grid">
                 <div class="passport-cell">
-                    <div class="value-label">Machine</div>
-                    <div class="machine" style="font-size:1.65rem;font-weight:850;">{ctx.machine_value:.0f}</div>
+                    <div class="value-label">Forecast</div>
+                    <div class="machine" style="font-size:1.8rem;font-weight:850;">{ctx.machine_value:.0f}</div>
                 </div>
                 <div class="passport-cell">
-                    <div class="value-label">Planner</div>
-                    <div class="planner" style="font-size:1.65rem;font-weight:850;">{ctx.override_value:.0f}</div>
+                    <div class="value-label">Your number</div>
+                    <div class="planner" style="font-size:1.8rem;font-weight:850;">{ctx.override_value:.0f}</div>
                 </div>
                 <div class="passport-cell">
-                    <div class="value-label">Compass</div>
-                    <div class="compass" style="font-size:1.65rem;font-weight:850;">{output.recommended_value:.0f}</div>
+                    <div class="value-label">Suggested</div>
+                    <div class="compass" style="font-size:1.8rem;font-weight:850;">{output.recommended_value:.0f}</div>
                 </div>
                 <div class="passport-cell">
                     <div class="value-label">Final</div>
-                    <div class="positive" style="font-size:1.65rem;font-weight:850;">{final_value:.0f}</div>
+                    <div class="positive" style="font-size:1.8rem;font-weight:850;">{final_value:.0f}</div>
                 </div>
             </div>
 
-            <div style="margin-top:1rem;color:#C7D0DE;font-size:.78rem;line-height:1.75;">
+            <div style="margin-top:1rem;color:#C7D0DE;font-size:.9rem;line-height:1.75;">
                 <strong>Decision:</strong> {html.escape(ctx.product_id)} × {html.escape(ctx.sales_org_id)} × {html.escape(ctx.channel_id)}<br>
                 <strong>Planning period:</strong> {_planning_period(ctx.cutoff_date)} ·
-                <strong>Planner:</strong> {html.escape(ctx.decision_maker)}<br>
-                <strong>Reason class:</strong> {reason_class} ·
+                <strong>Decision by:</strong> {html.escape(ctx.decision_maker)}<br>
+                <strong>Reason type:</strong> {reason_class} ·
                 <strong>Confidence:</strong> {html.escape(str(output.confidence_level).title())}<br>
                 <strong>Reason:</strong> {reason}<br>
-                <strong>Evidence signals:</strong> {len(output.signals_used or [])} ·
-                <strong>Backend mode:</strong> {backend_mode}
+                <strong>Checks run:</strong> {len(output.signals_used or [])}
             </div>
 
-            <div style="margin-top:1rem;padding-top:.85rem;border-top:1px solid rgba(148,171,202,.17);color:#91A0B5;font-size:.72rem;line-height:1.55;">
-                This decision is now captured for future learning. When actuals arrive,
-                Compass can compare machine error with final-decision error and calculate
-                Forecast Value Added.
+            <div style="margin-top:1rem;padding-top:.85rem;border-top:1px solid rgba(148,171,202,.17);color:#91A0B5;font-size:.82rem;line-height:1.55;">
+                This decision is saved. Once real sales come in, Compass measures how much
+                your decision improved on the system's forecast.
             </div>
 </div>"""
     )
@@ -1280,10 +1476,10 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
     st.markdown(
         """
         <div class="hero">
-            <h1 class="hero-title">Review and defend the commitment</h1>
+            <h1 class="hero-title">How many units should we commit for next month?</h1>
             <p class="hero-copy">
-                Review the forecast, add your business insight, and make the final call
-                with support from five specialist agents.
+                Start with the system&#39;s forecast, adjust it using what you know about the market,
+                then confirm the final number. A few automatic checks back you up along the way.
             </p>
         </div>
         """,
@@ -1309,6 +1505,7 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
     if st.session_state.selected_sales_org not in org_ids:
         st.session_state.selected_sales_org = org_ids[0]
 
+    _step_header(1, "Pick what you're planning", "Choose the product, region and channel for this decision.")
     input_1, input_2, input_3, input_4 = st.columns([1.25, 1, .85, 1])
     with input_1:
         st.selectbox(
@@ -1336,7 +1533,7 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
         )
     with input_4:
         st.text_input(
-            "Planner ID",
+            "Your name or ID",
             key="decision_maker",
             on_change=_reset_analysis,
         )
@@ -1352,7 +1549,7 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
         orgs["sales_org_id"].astype(str) == sales_org_id
     ].iloc[0]
 
-    machine_value = _get_machine_value(product_id, sales_org_id, channel_id)
+    machine_value, machine_month = _get_machine_value(product_id, sales_org_id, channel_id)
 
     # First load or product change — start the slider at machine value (neutral position)
     if st.session_state.get("_override_needs_init", True):
@@ -1361,8 +1558,13 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
         st.session_state.planner_override = float(machine_value)
         st.session_state._override_needs_init = False
 
-    previous_actual = PREVIOUS_ACTUALS.get(product_id)
-    unit_margin = UNIT_MARGINS.get(product_id)
+    try:
+        cycle_label = dt.datetime.strptime(machine_month, "%Y-%m").strftime("%b %Y")
+    except ValueError:
+        cycle_label = machine_month
+    facts = _decision_facts(
+        product_id, sales_org_id, channel_id, machine_value, machine_month
+    )
 
     st.markdown(
         f"""
@@ -1385,52 +1587,89 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
             </div>
             <div class="context-box">
                 <div class="context-label">Planning period</div>
-                <div class="context-value">{_planning_period()}</div>
+                <div class="context-value">{cycle_label}</div>
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
+    st.markdown(
+        f"""
+        <div class="story-banner">
+            <div class="eyebrow">What you&#39;re looking at</div>
+            <div class="story-line">{_build_story_line(facts, machine_value, cycle_label)}</div>
+            <div class="story-foot">
+                Add what you know that the forecast can&#39;t see, then confirm your number below.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    _step_header(2, "Understand the forecast and set your number", "On the left: what the system predicts and how it compares to real sales. On the right: enter the number you want to commit and why.")
     left, right = st.columns([.85, 1.45], gap="large")
 
     with left:
-        # DEFAULT_OVERRIDES represents the plan submitted in the *previous* cycle
-        last_cycle_plan = float(DEFAULT_OVERRIDES.get(product_id, machine_value))
-        planner_plan = last_cycle_plan  # kept for backward-compat references below
-        planner_gap = last_cycle_plan - machine_value
-        planner_gap_text = (
-            f"{abs(planner_gap):.0f} {'above' if planner_gap > 0 else 'below'} this model"
-            if planner_gap != 0
-            else "Matches the model"
-        )
-
-        if previous_actual is None:
-            actual_value_text = "Not available"
-            actual_gap_text = "No previous comparison"
-        else:
-            actual_value_text = f"{float(previous_actual):.0f} units"
-            actual_gap = float(previous_actual) - machine_value
-            actual_gap_text = (
-                f"{abs(actual_gap):.0f} {'above' if actual_gap > 0 else 'below'} this forecast"
-                if actual_gap != 0
-                else "Matches this forecast"
+        # Recent run-rate (trailing 3-month average actual demand)
+        run_rate = facts.get("run_rate")
+        run_delta = facts.get("run_rate_delta_pct")
+        if run_rate:
+            run_rate_text = f"{run_rate:,.0f} / mo"
+            run_rate_note = (
+                f"Forecast is {abs(run_delta):.0f}% {'below' if run_delta < 0 else 'above'} this"
+                if run_delta is not None and abs(run_delta) >= 1
+                else "In line with the forecast"
             )
+        else:
+            run_rate_text, run_rate_note = "Not available", "No recent history"
 
-        margin_value_text = (
-            f"€{float(unit_margin):.0f} per unit"
-            if unit_margin is not None
-            else "Not available"
-        )
+        # Same calendar month last year (seasonality reference)
+        last_year = facts.get("last_year_qty")
+        ly_delta = facts.get("last_year_delta_pct")
+        if last_year:
+            last_year_text = f"{last_year:,.0f} units"
+            last_year_note = (
+                f"Forecast is {abs(ly_delta):.0f}% {'below' if ly_delta < 0 else 'above'} this"
+                if ly_delta is not None and abs(ly_delta) >= 1
+                else "Similar to the forecast"
+            )
+        else:
+            last_year_text, last_year_note = "Not available", "No prior-year data"
+
+        # Realised value per unit and revenue at stake
+        vpu = facts.get("value_per_unit")
+        revenue = facts.get("revenue_at_stake")
+        if vpu:
+            value_text = f"€{vpu:,.0f} per unit"
+            value_note = (
+                f"≈ {_money(revenue, short=True)} at the forecast"
+                if revenue
+                else "Average realised price"
+            )
+        else:
+            value_text, value_note = "Not available", "No price history"
+
+        # Latest stock position
+        stock_qty = facts.get("stock_qty")
+        if stock_qty is not None:
+            stock_text = f"{stock_qty:,.0f} units"
+            stock_note = (
+                f"{_money(facts.get('stock_value'), short=True)} · as of {facts.get('stock_as_of')}"
+                if facts.get("stock_value")
+                else f"as of {facts.get('stock_as_of')}"
+            )
+        else:
+            stock_text, stock_note = "Not available", "No stock snapshot"
 
         st.html(
             f"""<div class="forecast-card">
   <div class="forecast-top">
     <div>
-      <div class="eyebrow">Forecast snapshot</div>
-      <div class="forecast-heading">What the model expects this cycle</div>
+      <div class="eyebrow">The starting number</div>
+      <div class="forecast-heading">What the system predicts for next month</div>
     </div>
-    <div class="forecast-badge">● Model outlook</div>
+    <div class="forecast-badge">● System forecast</div>
   </div>
 
   <div class="forecast-main">
@@ -1439,32 +1678,33 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
   </div>
 
   <div class="forecast-message">
-    Use this as the starting point, then apply your market knowledge before making the final commitment.
+    Shown next to what this product has actually been selling, so you can see
+    how the forecast compares before you decide.
   </div>
 
   <div class="forecast-mini-grid">
     <div class="forecast-mini">
-      <div class="forecast-mini-label">Last cycle plan</div>
-      <div class="forecast-mini-value planner-tone">{planner_plan:.0f} units</div>
-      <div class="forecast-mini-note">{planner_gap_text}</div>
+      <div class="forecast-mini-label">Recent monthly sales</div>
+      <div class="forecast-mini-value">{run_rate_text}</div>
+      <div class="forecast-mini-note">{run_rate_note}</div>
     </div>
 
     <div class="forecast-mini">
-      <div class="forecast-mini-label">Last actual</div>
-      <div class="forecast-mini-value">{actual_value_text}</div>
-      <div class="forecast-mini-note">{actual_gap_text}</div>
+      <div class="forecast-mini-label">Same month last year</div>
+      <div class="forecast-mini-value">{last_year_text}</div>
+      <div class="forecast-mini-note">{last_year_note}</div>
     </div>
 
     <div class="forecast-mini">
-      <div class="forecast-mini-label">Value per unit</div>
-      <div class="forecast-mini-value">{margin_value_text}</div>
-      <div class="forecast-mini-note">Estimated unit margin</div>
+      <div class="forecast-mini-label">Sales value per unit</div>
+      <div class="forecast-mini-value">{value_text}</div>
+      <div class="forecast-mini-note">{value_note}</div>
     </div>
 
     <div class="forecast-mini">
-      <div class="forecast-mini-label">Product family</div>
-      <div class="forecast-mini-value">{html.escape(str(product_row['category']))}</div>
-      <div class="forecast-mini-note">Planning category</div>
+      <div class="forecast-mini-label">Units in stock</div>
+      <div class="forecast-mini-value">{stock_text}</div>
+      <div class="forecast-mini-note">{stock_note}</div>
     </div>
   </div>
 </div>"""
@@ -1474,8 +1714,8 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
         st.markdown(
             """
             <div class="glass-card">
-                <div class="eyebrow">Planner judgment</div>
-                <div class="card-title">Set the proposed commitment</div>
+                <div class="eyebrow">Your decision</div>
+                <div class="card-title">Set the number you want to commit</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1497,7 +1737,7 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
         control_a, control_b = st.columns([1.55, .7])
         with control_a:
             st.slider(
-                "Planner override",
+                "Your proposed units",
                 min_value=slider_min,
                 max_value=slider_max,
                 key="override_slider",
@@ -1520,21 +1760,49 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
             (override_value - machine_value) / max(machine_value, 1.0) * 100.0
         )
         difference_class = "positive" if difference_pct >= 0 else "negative"
+        direction_word = "higher than" if difference_pct >= 0 else "lower than"
         st.markdown(
-            f'<div class="{difference_class}" style="font-size:.82rem;font-weight:800;margin:.1rem 0 .7rem;">'
-            f'{difference_pct:+.1f}% versus machine forecast</div>',
+            f'<div class="{difference_class}" style="font-size:.92rem;font-weight:800;margin:.1rem 0 .35rem;">'
+            f'{abs(difference_pct):.1f}% {direction_word} the forecast</div>',
             unsafe_allow_html=True,
         )
 
+        # Consequence preview — what this commitment risks vs the model baseline
+        gap = override_value - machine_value
+        vpu = facts.get("value_per_unit")
+        if abs(gap) < 1:
+            st.markdown(
+                '<div class="consequence balanced">'
+                '<strong>Matched to the forecast.</strong> No directional bet — '
+                'risk is balanced between under- and over-committing.</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            units = abs(gap)
+            euros = f" (~{_money(units * vpu, short=True)})" if vpu else ""
+            if gap < 0:
+                msg = (
+                    f"<strong>Committing {units:,.0f} units below the forecast.</strong> "
+                    f"If demand lands near the forecast, about {units:,.0f} units{euros} "
+                    f"of demand could go unmet."
+                )
+            else:
+                msg = (
+                    f"<strong>Committing {units:,.0f} units above the forecast.</strong> "
+                    f"If demand lands near the forecast, about {units:,.0f} units{euros} "
+                    f"could sit as excess stock."
+                )
+            st.markdown(f'<div class="consequence risk">{msg}</div>', unsafe_allow_html=True)
+
         st.text_area(
-            "What does the planner know that the model does not? *",
+            "Why are you changing it? What do you know that the forecast doesn't? *",
             key="reason_text",
             height=115,
             on_change=_reset_analysis,
         )
 
         analyse_clicked = st.button(
-            "Ask Compass to Review",
+            "Check my decision",
             type="primary",
             use_container_width=True,
         )
@@ -1544,11 +1812,11 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
         planner_id = str(st.session_state.decision_maker).strip()
 
         if override_value <= 0:
-            st.error("Enter a valid planner override greater than zero.")
+            st.error("Enter a number greater than zero.")
         elif not reason_text:
-            st.error("Enter the planner's business reason before analysis.")
+            st.error("Add your reason before running the checks.")
         elif not planner_id:
-            st.error("Enter a planner ID before analysis.")
+            st.error("Enter your name or ID before running the checks.")
         else:
             ctx = DecisionContext(
                 product_id=product_id,
@@ -1613,8 +1881,30 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
     signals = list(output.signals_used or [])
 
     st.markdown("---")
-    st.markdown("## What Compass found")
+    _step_header(3, "See what the checks found", "Independent checks of your number against demand, supply, finance, market and past decisions.")
     if signals:
+        # Lead line: how the evidence leans, in plain language
+        ups = sum(
+            1 for s in signals
+            if _push_direction(s, ctx.override_value, ctx.machine_value)[0] == "up"
+        )
+        downs = sum(
+            1 for s in signals
+            if _push_direction(s, ctx.override_value, ctx.machine_value)[0] == "down"
+        )
+        if ups and not downs:
+            lead = f"{ups} of {len(signals)} checks point to **stronger** demand than the forecast."
+        elif downs and not ups:
+            lead = f"{downs} of {len(signals)} checks point to **softer** demand than the forecast."
+        elif ups or downs:
+            lead = (
+                f"The evidence is mixed — **{ups}** point to stronger demand, "
+                f"**{downs}** to softer."
+            )
+        else:
+            lead = "The evidence is broadly neutral on demand direction."
+        st.markdown(lead)
+
         # First row: 3 cards. Second row: remaining 2 cards.
         first_row = signals[:3]
         second_row = signals[3:]
@@ -1622,13 +1912,13 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
         cols = st.columns(len(first_row))
         for column, signal in zip(cols, first_row):
             with column:
-                _render_agent_card(signal)
+                _render_agent_card(signal, ctx.override_value, ctx.machine_value)
 
         if second_row:
             cols = st.columns(len(second_row))
             for column, signal in zip(cols, second_row):
                 with column:
-                    _render_agent_card(signal)
+                    _render_agent_card(signal, ctx.override_value, ctx.machine_value)
     else:
         st.info("Compass did not find any meaningful evidence for this decision.")
 
@@ -1639,32 +1929,32 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
     st.markdown(
         f"""
         <div class="recommendation-card">
-            <div class="eyebrow" style="color:#B295FF;">Compass Recommendation</div>
+            <div class="eyebrow" style="color:#B295FF;">Suggested number</div>
             <div class="recommendation-grid" style="margin-top:.9rem;">
                 <div>
-                    <div class="value-label">Machine forecast</div>
+                    <div class="value-label">System forecast</div>
                     <div class="machine" style="font-size:2.05rem;font-weight:850;">{ctx.machine_value:.0f}</div>
                 </div>
                 <div>
-                    <div class="value-label">Planner proposal</div>
+                    <div class="value-label">Your proposal</div>
                     <div class="planner" style="font-size:2.05rem;font-weight:850;">{ctx.override_value:.0f}</div>
                 </div>
                 <div>
-                    <div class="value-label">Compass recommends</div>
+                    <div class="value-label">Suggested</div>
                     <div class="compass" style="font-size:4.35rem;font-weight:900;line-height:.92;letter-spacing:-.06em;">{output.recommended_value:.0f}</div>
-                    <div style="color:#91A0B5;font-size:.71rem;margin-top:.25rem;">units · {html.escape(str(output.confidence_level).title())} confidence</div>
+                    <div style="color:#91A0B5;font-size:.82rem;margin-top:.25rem;">units · {html.escape(str(output.confidence_level).title())} confidence</div>
                 </div>
             </div>
             <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-top:1rem;">
-                <span class="mode-pill">{machine_delta:+.0f} vs machine</span>
-                <span class="mode-pill">{planner_delta:+.0f} vs planner</span>
-                <span class="mode-pill">{len(signals)} evidence signals</span>
+                <span class="mode-pill">{machine_delta:+.0f} vs forecast</span>
+                <span class="mode-pill">{planner_delta:+.0f} vs your number</span>
+                <span class="mode-pill">{len(signals)} checks run</span>
             </div>
-            <div style="margin-top:1rem;padding-top:.9rem;border-top:1px solid rgba(178,149,255,.2);color:#C7D0DE;font-size:.81rem;line-height:1.7;">
+            <div style="margin-top:1rem;padding-top:.9rem;border-top:1px solid rgba(178,149,255,.2);color:#C7D0DE;font-size:.94rem;line-height:1.7;">
                 {html.escape(str(output.rationale))}
             </div>
-            <div style="margin-top:.75rem;color:#91A0B5;font-size:.7rem;">
-                Recommendation only — the human still decides.
+            <div style="margin-top:.75rem;color:#91A0B5;font-size:.8rem;">
+                This is only a suggestion — you make the final call.
             </div>
         </div>
         """,
@@ -1674,22 +1964,22 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
     _render_memory(output.memory_context)
 
     st.markdown("---")
-    st.markdown("## Human final decision")
+    _step_header(4, "Confirm and commit", "Pick your final number and save the decision.")
 
     choice = st.radio(
-        "Choose how to commit",
+        "Pick your final number",
         [
-            "Accept Compass recommendation",
-            "Keep my original override",
-            "Enter another value",
+            "Use the suggested number",
+            "Keep my own number",
+            "Type a different number",
         ],
         key="final_decision_mode",
         horizontal=True,
     )
 
-    if choice == "Accept Compass recommendation":
+    if choice == "Use the suggested number":
         final_value = float(output.recommended_value)
-    elif choice == "Keep my original override":
+    elif choice == "Keep my own number":
         final_value = float(ctx.override_value)
     else:
         final_value = float(
@@ -1706,9 +1996,9 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
     st.markdown(
         f"""
         <div class="glass-card">
-            <div class="value-label">Final human commitment</div>
+            <div class="value-label">Your committed number</div>
             <div class="big-value positive">{final_value:.0f}</div>
-            <div style="color:#91A0B5;font-size:.72rem;margin-top:.2rem;">units · Human approval required</div>
+            <div style="color:#91A0B5;font-size:.82rem;margin-top:.2rem;">units · you approved this</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1716,7 +2006,7 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
 
     if not st.session_state.decision_saved:
         if st.button(
-            "Commit Final Decision",
+            "Confirm and save",
             type="primary",
             use_container_width=True,
         ):
