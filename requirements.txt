@@ -1,3 +1,4 @@
+-e .
 anthropic
 fastapi
 uvicorn[standard]
