@@ -19,8 +19,7 @@ st.set_page_config(
 )
 
 
-COMPASS_CSS = """
-<style>
+DARK_VARS = """
     :root {
         --bg: #07111d;
         --surface: #0f1828;
@@ -33,17 +32,195 @@ COMPASS_CSS = """
         --green: #55dda4;
         --amber: #ffbd63;
     }
+"""
 
-    html, body, [data-testid="stAppViewContainer"], .stApp {
+LIGHT_VARS = """
+    :root {
+        --bg: #f4f7fc;
+        --surface: #ffffff;
+        --surface-2: #edf1f8;
+        --border: #cdd8ea;
+        --text: #0d1b2e;
+        --muted: #4d6278;
+        --cyan: #0891b2;
+        --violet: #6d28d9;
+        --green: #059669;
+        --amber: #b45309;
+    }
+"""
+
+LIGHT_VIEW_OVERRIDES = """
+<style>
+    .hero {
+        background:
+            radial-gradient(circle at 88% 10%, rgba(109,40,217,.08), transparent 30%),
+            linear-gradient(145deg, #ffffff, #f0f5ff) !important;
+        border-color: rgba(99,131,179,.2) !important;
+        box-shadow: 0 8px 28px rgba(0,0,0,.07) !important;
+    }
+    .hero-title { color: #0d1b2e !important; }
+    .hero-copy, .muted-copy { color: #4d6278 !important; }
+    .eyebrow { color: #0891b2 !important; }
+    .context-box, .glass-card, .signal-card, .passport-card, .recommendation-card {
+        background: linear-gradient(145deg, #ffffff, #f5f8ff) !important;
+        border-color: rgba(99,131,179,.2) !important;
+        box-shadow: 0 4px 18px rgba(0,0,0,.07) !important;
+    }
+    .forecast-card {
+        background:
+            radial-gradient(circle at 90% 8%, rgba(8,145,178,.08), transparent 34%),
+            linear-gradient(150deg, #f0faff, #e8f5fd) !important;
+        border-color: rgba(8,145,178,.22) !important;
+        box-shadow: 0 6px 24px rgba(0,0,0,.07) !important;
+    }
+    .forecast-heading { color: #0d1b2e !important; }
+    .forecast-badge {
+        color: #0891b2 !important;
+        background: rgba(8,145,178,.08) !important;
+        border-color: rgba(8,145,178,.25) !important;
+    }
+    .forecast-number { color: #0891b2 !important; text-shadow: none !important; }
+    .forecast-unit { color: #4d6278 !important; }
+    .forecast-message { color: #3d5570 !important; }
+    .forecast-mini {
+        background: rgba(0,0,0,.03) !important;
+        border-color: rgba(99,131,179,.18) !important;
+    }
+    .forecast-mini-label { color: #4d6278 !important; }
+    .forecast-mini-value { color: #0d1b2e !important; }
+    .forecast-mini-note { color: #5a7090 !important; }
+    .context-label, .value-label { color: #4d6278 !important; }
+    .context-value { color: #0d1b2e !important; }
+    .card-title { color: #0d1b2e !important; }
+    .card-copy { color: #4d6278 !important; }
+    .machine { color: #0891b2 !important; }
+    .planner { color: #b45309 !important; }
+    .compass { color: #6d28d9 !important; }
+    .positive { color: #059669 !important; }
+    .negative { color: #dc2626 !important; }
+    .signal-card.support-card {
+        background:
+            radial-gradient(circle at 92% 8%, rgba(5,150,105,.1), transparent 34%),
+            linear-gradient(145deg, #f0fff8, #e8fff4) !important;
+        border-color: rgba(5,150,105,.28) !important;
+        box-shadow: 0 6px 20px rgba(5,150,105,.08) !important;
+    }
+    .signal-card.challenge-card {
+        background:
+            radial-gradient(circle at 92% 7%, rgba(220,38,38,.12), transparent 37%),
+            linear-gradient(145deg, #fff5f5, #ffeaea) !important;
+        border-color: rgba(220,38,38,.35) !important;
+        box-shadow: 0 6px 20px rgba(220,38,38,.08) !important;
+    }
+    .signal-card.challenge-card::before {
+        background: linear-gradient(#dc2626, #ef4444) !important;
+    }
+    .signal-card.neutral-card {
+        background:
+            radial-gradient(circle at 92% 8%, rgba(8,145,178,.1), transparent 34%),
+            linear-gradient(145deg, #f0f8ff, #e8f3ff) !important;
+        border-color: rgba(8,145,178,.25) !important;
+    }
+    .signal-icon { background: rgba(0,0,0,.04) !important; }
+    .signal-name { color: #0d1b2e !important; }
+    .signal-summary { color: #4d6278 !important; }
+    .signal-claim { color: #1e3a52 !important; }
+    .signal-friendly-meta { color: #5a7090 !important; border-color: rgba(99,131,179,.18) !important; }
+    .support { color: #059669 !important; border-color: rgba(5,150,105,.28) !important; }
+    .challenge { color: #dc2626 !important; border-color: rgba(220,38,38,.35) !important; }
+    .neutral { color: #0891b2 !important; border-color: rgba(8,145,178,.28) !important; }
+    .recommendation-card {
+        background:
+            radial-gradient(circle at 78% 20%, rgba(109,40,217,.08), transparent 36%),
+            linear-gradient(145deg, #faf8ff, #f3eeff) !important;
+        border-color: rgba(109,40,217,.25) !important;
+    }
+    .passport-card {
+        background:
+            radial-gradient(circle at 88% 12%, rgba(5,150,105,.08), transparent 30%),
+            linear-gradient(145deg, #f0fff8, #eafff5) !important;
+        border-color: rgba(5,150,105,.28) !important;
+    }
+    .passport-cell {
+        background: rgba(0,0,0,.03) !important;
+        border-color: rgba(99,131,179,.15) !important;
+    }
+    .mode-pill, .direction-pill {
+        background: rgba(0,0,0,.045) !important;
+        border-color: rgba(99,131,179,.22) !important;
+        color: #0d1b2e !important;
+    }
+    .mode-pill.live { color: #059669 !important; border-color: rgba(5,150,105,.32) !important; }
+    .mode-pill.fallback { color: #b45309 !important; border-color: rgba(180,83,9,.32) !important; }
+
+    /* ── Replay dashboard overrides ── */
+    .replay-hero {
+        background:
+            radial-gradient(circle at 88% 12%, rgba(109,40,217,.08), transparent 35%),
+            linear-gradient(145deg, #ffffff, #f0f4ff) !important;
+        border-color: rgba(99,131,179,.2) !important;
+        box-shadow: 0 8px 28px rgba(0,0,0,.07) !important;
+    }
+    .replay-kicker { color: #0891b2 !important; }
+    .replay-title { color: #0d1b2e !important; }
+    .replay-copy { color: #4d6278 !important; }
+    .filter-panel {
+        background: linear-gradient(145deg, #ffffff, #f4f7fc) !important;
+        border-color: rgba(99,131,179,.2) !important;
+    }
+    .filter-title { color: #0d1b2e !important; }
+    .filter-copy { color: #4d6278 !important; }
+    .range-summary {
+        background: rgba(109,40,217,.04) !important;
+        border-color: rgba(109,40,217,.15) !important;
+    }
+    .range-label { color: #4d6278 !important; }
+    .range-value { color: #0d1b2e !important; }
+    .range-tag { color: #6d28d9 !important; background: rgba(109,40,217,.06) !important; border-color: rgba(109,40,217,.2) !important; }
+    .story-card {
+        background: linear-gradient(145deg, #ffffff, #f4f8ff) !important;
+        border-color: rgba(99,131,179,.18) !important;
+        box-shadow: 0 4px 16px rgba(0,0,0,.06) !important;
+    }
+    .story-icon { background: rgba(0,0,0,.04) !important; border-color: rgba(99,131,179,.15) !important; }
+    .story-label { color: #4d6278 !important; }
+    .story-value { color: #0d1b2e !important; }
+    .story-detail { color: #4d6278 !important; }
+    .status-good { color: #059669 !important; background: rgba(5,150,105,.07) !important; }
+    .status-watch { color: #b45309 !important; background: rgba(180,83,9,.07) !important; }
+    .status-risk { color: #dc2626 !important; background: rgba(220,38,38,.07) !important; }
+    .status-info { color: #0891b2 !important; background: rgba(8,145,178,.07) !important; }
+    .section-heading { color: #0d1b2e !important; }
+    .section-copy { color: #4d6278 !important; }
+    .memory-wrap {
+        background:
+            radial-gradient(circle at 95% 5%, rgba(109,40,217,.07), transparent 30%),
+            linear-gradient(145deg, #faf8ff, #f3eeff) !important;
+        border-color: rgba(109,40,217,.2) !important;
+    }
+    .memory-title { color: #0d1b2e !important; }
+    .memory-stage { color: #6d28d9 !important; background: rgba(109,40,217,.06) !important; border-color: rgba(109,40,217,.2) !important; }
+    .memory-message { color: #3d5570 !important; }
+    .memory-track { background: rgba(0,0,0,.08) !important; }
+    .memory-stat { background: rgba(0,0,0,.03) !important; border-color: rgba(99,131,179,.15) !important; }
+    .memory-stat-label { color: #4d6278 !important; }
+</style>
+"""
+
+COMPASS_CSS_TEMPLATE = """
+<style>
+    {vars}
+
+    html, body, [data-testid="stAppViewContainer"], .stApp {{
         background: var(--bg) !important;
         color: var(--text) !important;
-    }
+    }}
 
-    .stApp {
+    .stApp {{
         background:
             radial-gradient(900px 520px at 8% -12%, rgba(63, 104, 180, .20), transparent 60%),
             var(--bg) !important;
-    }
+    }}
 
     /* The workspace navigation now lives in the top-right header. */
     section[data-testid="stSidebar"],
@@ -121,13 +298,36 @@ COMPASS_CSS = """
         gap: .4rem;
     }
 
-    div[data-testid="stRadio"] [role="radiogroup"] label {
+    div[data-testid="stRadio"] [role="radiogroup"] label {{
         border: 1px solid var(--border);
         border-radius: 999px;
         padding: .38rem .7rem;
         background: rgba(255,255,255,.025);
-    }
+    }}
 
+    /* Theme toggle button */
+    .theme-btn {{
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .38rem .75rem;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: rgba(255,255,255,.04);
+        color: var(--muted);
+        font-size: .72rem;
+        font-weight: 800;
+        letter-spacing: .06em;
+        cursor: pointer;
+        user-select: none;
+        transition: background .15s, border-color .15s;
+        white-space: nowrap;
+    }}
+    .theme-btn:hover {{
+        background: rgba(255,255,255,.09);
+        border-color: var(--cyan);
+        color: var(--text);
+    }}
 
     /* Hide Streamlit chrome: menu, toolbar, Deploy button and header. */
     #MainMenu,
@@ -137,21 +337,28 @@ COMPASS_CSS = """
     [data-testid="stStatusWidget"],
     [data-testid="stAppDeployButton"],
     [data-testid="stToolbarActions"],
-    .stDeployButton {
+    .stDeployButton {{
         display: none !important;
         visibility: hidden !important;
         height: 0 !important;
-    }
+    }}
 
 </style>
 """
 
-st.markdown(COMPASS_CSS, unsafe_allow_html=True)
 st.session_state.setdefault("compass_view", "Live Decision")
+st.session_state.setdefault("dark_mode", True)
+
+dark_mode: bool = bool(st.session_state["dark_mode"])
+vars_block = DARK_VARS if dark_mode else LIGHT_VARS
+compass_css = COMPASS_CSS_TEMPLATE.format(vars=vars_block)
+st.markdown(compass_css, unsafe_allow_html=True)
+if not dark_mode:
+    st.markdown(LIGHT_VIEW_OVERRIDES, unsafe_allow_html=True)
 
 
-# Single Compass title on the left and workspace navigation on the right.
-brand_col, workspace_col = st.columns([1.7, 1], vertical_alignment="center")
+# Header: brand left, workspace navigation centre-right, theme toggle far right.
+brand_col, workspace_col, theme_col = st.columns([1.7, 1, 0.28], vertical_alignment="center")
 
 with brand_col:
     st.markdown(
@@ -176,11 +383,17 @@ with workspace_col:
         label_visibility="visible",
     )
 
+with theme_col:
+    icon = "☀️" if dark_mode else "🌙"
+    label = "Light" if dark_mode else "Dark"
+    if st.button(f"{icon} {label}", key="theme_toggle", use_container_width=True):
+        st.session_state["dark_mode"] = not dark_mode
+        st.rerun()
+
 st.markdown('<div class="top-divider"></div>', unsafe_allow_html=True)
 
 
 if st.session_state["compass_view"] == "Live Decision":
-    # Try the real backend automatically; the view falls back safely if unavailable.
-    render_live_decision(force_fallback=False)
+    render_live_decision(force_fallback=False, dark_mode=dark_mode)
 else:
-    render_replay_dashboard(force_fallback=False)
+    render_replay_dashboard(force_fallback=False, dark_mode=dark_mode)

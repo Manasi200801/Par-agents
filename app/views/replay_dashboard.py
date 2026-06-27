@@ -654,7 +654,7 @@ def _story_card(
 # ---------------------------------------------------------------------------
 # Main view
 # ---------------------------------------------------------------------------
-def render(force_fallback: bool = False) -> None:
+def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
     _install_css()
 
     chart, stats, _ = get_replay_data(force_fallback)

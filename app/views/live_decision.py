@@ -1268,7 +1268,7 @@ def _render_passport(
 # -----------------------------------------------------------------------------
 # Main page
 # -----------------------------------------------------------------------------
-def render(force_fallback: bool = False) -> None:
+def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
     """Render the complete Compass Live Decision experience."""
     _init_state()
     st.markdown(VIEW_CSS, unsafe_allow_html=True)
