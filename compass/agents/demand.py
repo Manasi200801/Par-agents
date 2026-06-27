@@ -33,7 +33,7 @@ def get_signals(ctx: DecisionContext) -> list:
         total_confirmed = confirmed['confirmed_qty'].sum()
         direction = "supports_override" if total_confirmed < ctx.machine_value else "contradicts_override"
         signals.append(Signal(
-            agent_name    = "Demand",
+            agent_name    = "Demand · Orders",
             claim         = (
                 f"{len(confirmed)} confirmed orders in {ctx.sales_org_id} total "
                 f"{int(total_confirmed)} units "
@@ -56,7 +56,7 @@ def get_signals(ctx: DecisionContext) -> list:
     if len(declining) > 0:
         direction = "supports_override" if ctx.override_value < ctx.machine_value else "contradicts_override"
         signals.append(Signal(
-            agent_name    = "Demand",
+            agent_name    = "Demand · Customers",
             claim         = f"{len(declining)} customer(s) in {ctx.sales_org_id} are flagged as declining.",
             direction     = direction,
             magnitude     = 0.4,
@@ -75,7 +75,7 @@ def get_signals(ctx: DecisionContext) -> list:
         top_reason = recent_returns['return_reason'].mode()
         top_reason_str = top_reason.iloc[0] if len(top_reason) > 0 else "n/a"
         signals.append(Signal(
-            agent_name    = "Demand",
+            agent_name    = "Demand · Returns",
             claim         = (
                 f"{len(recent_returns)} recent return events for this SKU: "
                 f"{int(total_return_qty)} units returned. "

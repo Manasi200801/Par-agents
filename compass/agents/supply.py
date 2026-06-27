@@ -24,6 +24,7 @@ def _load():
 def get_signals(ctx: DecisionContext) -> list:
     _load()
     signals = []
+    _stock_snapshot = None  # (stock df row, cover_weeks) for fallback
 
     # Signal 1: stock cover weeks
     stock = _stock[
@@ -35,6 +36,7 @@ def get_signals(ctx: DecisionContext) -> list:
         stock_qty   = stock.iloc[0]['stock_qty_bu']
         weekly_rate = ctx.machine_value / 4.0
         cover_weeks = stock_qty / weekly_rate if weekly_rate > 0 else 0
+        _stock_snapshot = (stock, cover_weeks)
         if cover_weeks < 3:
             signals.append(Signal(
                 agent_name    = "Supply / Ops",
@@ -52,7 +54,6 @@ def get_signals(ctx: DecisionContext) -> list:
     # Signal 2: supplier OTIF for this product
     supplier_pos = _pos[_pos['product_id'] == ctx.product_id].copy()
     if len(supplier_pos) > 0:
-        # Only compute OTIF for rows that have both delivery dates
         scored = supplier_pos.dropna(subset=['actual_delivery_week', 'expected_delivery_week'])
         if len(scored) > 0:
             scored = scored.copy()
@@ -92,6 +93,33 @@ def get_signals(ctx: DecisionContext) -> list:
                 confidence    = 0.7,
                 table         = "production_data",
                 evidence_rows = prod[['period_month', 'planned_output', 'actual_output']].to_dict('records'),
+            ))
+
+    # Fallback: always surface supply status so the panel is never silent
+    if len(signals) == 0:
+        if _stock_snapshot is not None:
+            s_df, cw = _stock_snapshot
+            signals.append(Signal(
+                agent_name    = "Supply / Ops",
+                claim         = (
+                    f"Stock cover is {cw:.1f} weeks at the machine forecast rate — "
+                    f"no supply constraint identified for this override."
+                ),
+                direction     = "neutral",
+                magnitude     = 0.1,
+                confidence    = 0.8,
+                table         = "stock_on_hand",
+                evidence_rows = s_df[['date', 'stock_qty_bu', 'stock_value_eur']].to_dict('records'),
+            ))
+        else:
+            signals.append(Signal(
+                agent_name    = "Supply / Ops",
+                claim         = "No stock data found for this product — supply status unverified.",
+                direction     = "neutral",
+                magnitude     = 0.0,
+                confidence    = 0.3,
+                table         = "stock_on_hand",
+                evidence_rows = [],
             ))
 
     return signals

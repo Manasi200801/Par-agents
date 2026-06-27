@@ -768,9 +768,10 @@ def _init_state() -> None:
         "selected_product": "CP-0271",
         "selected_sales_org": "SO04",
         "selected_channel": "CH01",
-        "planner_override": 750.0,
-        "override_slider": 750,
-        "override_number": 750.0,
+        "planner_override": 0.0,
+        "override_slider": 0,
+        "override_number": 0.0,
+        "_override_needs_init": True,
         "reason_text": DEFAULT_REASON,
         "decision_maker": "planner_001",
         "pipeline_output": None,
@@ -814,14 +815,14 @@ def _sync_from_number() -> None:
 
 
 def _on_product_change() -> None:
-    product_id = st.session_state.selected_product
-    override = DEFAULT_OVERRIDES.get(
-        product_id,
-        MACHINE_VALUES.get(product_id, 400.0),
-    )
-    st.session_state.override_slider = int(round(override))
-    st.session_state.override_number = float(override)
-    st.session_state.planner_override = float(override)
+    product_id   = st.session_state.selected_product
+    sales_org_id = st.session_state.selected_sales_org
+    channel_id   = st.session_state.selected_channel
+    machine = _get_machine_value(product_id, sales_org_id, channel_id)
+    st.session_state.override_slider = int(round(machine))
+    st.session_state.override_number = float(machine)
+    st.session_state.planner_override = float(machine)
+    st.session_state._override_needs_init = False
     _reset_analysis()
 
 
@@ -1352,6 +1353,14 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
     ].iloc[0]
 
     machine_value = _get_machine_value(product_id, sales_org_id, channel_id)
+
+    # First load or product change — start the slider at machine value (neutral position)
+    if st.session_state.get("_override_needs_init", True):
+        st.session_state.override_slider = int(round(machine_value))
+        st.session_state.override_number = float(machine_value)
+        st.session_state.planner_override = float(machine_value)
+        st.session_state._override_needs_init = False
+
     previous_actual = PREVIOUS_ACTUALS.get(product_id)
     unit_margin = UNIT_MARGINS.get(product_id)
 
@@ -1386,10 +1395,12 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
     left, right = st.columns([.85, 1.45], gap="large")
 
     with left:
-        planner_plan = float(DEFAULT_OVERRIDES.get(product_id, machine_value))
-        planner_gap = planner_plan - machine_value
+        # DEFAULT_OVERRIDES represents the plan submitted in the *previous* cycle
+        last_cycle_plan = float(DEFAULT_OVERRIDES.get(product_id, machine_value))
+        planner_plan = last_cycle_plan  # kept for backward-compat references below
+        planner_gap = last_cycle_plan - machine_value
         planner_gap_text = (
-            f"{abs(planner_gap):.0f} {'above' if planner_gap > 0 else 'below'} the model"
+            f"{abs(planner_gap):.0f} {'above' if planner_gap > 0 else 'below'} this model"
             if planner_gap != 0
             else "Matches the model"
         )
@@ -1433,7 +1444,7 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
 
   <div class="forecast-mini-grid">
     <div class="forecast-mini">
-      <div class="forecast-mini-label">Current plan</div>
+      <div class="forecast-mini-label">Last cycle plan</div>
       <div class="forecast-mini-value planner-tone">{planner_plan:.0f} units</div>
       <div class="forecast-mini-note">{planner_gap_text}</div>
     </div>
@@ -1475,9 +1486,8 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
 
         # Keep state valid when a newly selected product has a different range.
         if not slider_min <= int(st.session_state.override_slider) <= slider_max:
-            default_override = int(round(DEFAULT_OVERRIDES.get(product_id, machine_value)))
-            st.session_state.override_slider = default_override
-            st.session_state.override_number = float(default_override)
+            st.session_state.override_slider = int(round(machine_value))
+            st.session_state.override_number = float(machine_value)
 
         control_a, control_b = st.columns([1.55, .7])
         with control_a:

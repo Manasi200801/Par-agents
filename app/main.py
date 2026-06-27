@@ -132,6 +132,30 @@ COMPASS_STATIC_CSS = """
         background: var(--border);
     }
 
+    .api-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: .63rem;
+        font-weight: 700;
+        letter-spacing: .07em;
+        text-transform: uppercase;
+        padding: .18rem .55rem;
+        border-radius: 999px;
+        margin-left: .5rem;
+        vertical-align: middle;
+    }
+    .api-status.live {
+        color: var(--green);
+        background: rgba(85,221,164,.10);
+        border: 1px solid rgba(85,221,164,.25);
+    }
+    .api-status.demo {
+        color: var(--amber);
+        background: rgba(255,189,99,.10);
+        border: 1px solid rgba(255,189,99,.25);
+    }
+
     div[data-testid="stMetric"] {
         background: var(--surface);
         border: 1px solid var(--border);
@@ -355,6 +379,31 @@ LIGHT_VIEW_OVERRIDES = """
     /* Section headings rendered as plain HTML */
     .stMarkdown h2, .stMarkdown h3 { color: #0d1b2e !important; }
     p, li { color: #1e3a52; }
+
+    /* ── API status chip in light mode ── */
+    .api-status.live {
+        background: rgba(5,150,105,.08) !important;
+        border-color: rgba(5,150,105,.25) !important;
+        color: #059669 !important;
+    }
+    .api-status.demo {
+        background: rgba(180,83,9,.08) !important;
+        border-color: rgba(180,83,9,.25) !important;
+        color: #b45309 !important;
+    }
+
+    /* ── Theme toggle button ── */
+    [data-testid="stBaseButton-secondary"] {
+        background: rgba(13,27,46,.05) !important;
+        color: #0d1b2e !important;
+        border: 1px solid #cdd8ea !important;
+        border-radius: 10px !important;
+        font-size: .8rem !important;
+    }
+    [data-testid="stBaseButton-secondary"]:hover {
+        background: rgba(13,27,46,.10) !important;
+        border-color: #aebfd4 !important;
+    }
 </style>
 """
 
@@ -362,6 +411,10 @@ LIGHT_VIEW_OVERRIDES = """
 # -----------------------------------------------------------------------------
 # App bootstrap
 # -----------------------------------------------------------------------------
+_api_live = bool(os.environ.get("ANTHROPIC_API_KEY"))
+_api_dot_class = "live" if _api_live else "demo"
+_api_dot_label = "● Live AI" if _api_live else "● Demo mode"
+
 st.session_state.setdefault("compass_view", "Live Decision")
 st.session_state.setdefault("dark_mode", True)
 
@@ -379,12 +432,15 @@ brand_col, workspace_col, theme_col = st.columns([1.7, 1, 0.28], vertical_alignm
 
 with brand_col:
     st.markdown(
-        """
+        f"""
         <div class="brand-shell">
             <div class="brand-logo">🧭</div>
             <div>
                 <div class="brand-title">Compass</div>
-                <div class="brand-subtitle">Human-centred demand planning intelligence</div>
+                <div class="brand-subtitle">
+                    Human-centred demand planning intelligence
+                    <span class="api-status {_api_dot_class}">{_api_dot_label}</span>
+                </div>
             </div>
         </div>
         """,
