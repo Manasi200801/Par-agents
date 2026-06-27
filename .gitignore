@@ -23,8 +23,7 @@ venv/
 data/*.duckdb
 data/*.duckdb.wal
 
-# Large parquet source data (folders, not the directory itself)
-data/alpine-manufacturing-forecast/
-data/alpine-manufacturing-gmbh/
+# Firn data is out of scope
 data/firn-outdoor-ag/
-data/*.parquet
+# Alpine forecast variant — not used (we use gmbh)
+data/alpine-manufacturing-forecast/
