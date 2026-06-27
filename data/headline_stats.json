@@ -1,0 +1,12 @@
+{
+  "total_rows": 10152,
+  "pct_helped": 0.2898936170212766,
+  "pct_hurt": 0.7101063829787234,
+  "mae_machine": 77954.21614460205,
+  "mae_planner": 84790.38404255318,
+  "mae_change_pct": 8.769465252873953,
+  "upward_pct_helped": 0.9832749902761572,
+  "downward_pct_helped": 0.05474211845402981,
+  "upward_share": 0.25325059101654845,
+  "downward_share": 0.7467494089834515
+}
