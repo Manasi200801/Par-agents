@@ -1,1 +1,1 @@
-# Par-agents
+![Compass architecture](docs/compass-architecture.png)
