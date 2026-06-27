@@ -1,9 +1,10 @@
 """
 SHARED CONTRACTS — Everyone imports from this file.
-Do not change without telling the whole team.
+P5 creates this file at Hour 0. No one changes it without telling the whole team.
+Filename: compass/contracts.py
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 import datetime
 
@@ -31,19 +32,19 @@ class Signal:
     agent_name: str
     claim: str                  # one plain-English sentence
     direction: str              # "supports_override" | "contradicts_override" | "neutral"
-    magnitude: float            # 0.0 – 1.0
-    confidence: float           # 0.0 – 1.0
+    magnitude: float            # 0.0 – 1.0  (how strong is the signal)
+    confidence: float           # 0.0 – 1.0  (how sure is the agent)
     table: str                  # which source table was read
-    evidence_rows: list         # actual rows from the table (list of dicts)
+    evidence_rows: list         # the actual rows from the table (list of dicts)
 
 
 @dataclass
 class MemoryContext:
-    """What the Memory/Critic agent returns."""
+    """What the Memory/Critic agent returns — separate type because it's richer."""
     planner_fva_history: dict           # avg_fva, n_decisions, pct_helpful
-    reason_type_history: dict           # avg_fva, avg_override_pct, avg_realized_pct
-    similar_past_events: list           # list of past event dicts
-    calibrated_suggestion: Optional[float]
+    reason_type_history: dict           # avg_fva, avg_override_pct, avg_realized_pct for this reason_class
+    similar_past_events: list           # list of past event dicts (reason_text, realized_impact, fva)
+    calibrated_suggestion: Optional[float]  # what history says the number should be
     confidence_level: str               # "low" | "medium" | "high"
 
 
@@ -53,7 +54,7 @@ class ReconcilerOutput:
     recommended_value: float
     confidence_level: str       # "low" | "medium" | "high"
     rationale: str              # plain English, 2-4 sentences
-    signals_used: list          # list of Signal objects
+    signals_used: list          # list of Signal objects that were used
     memory_context: MemoryContext
 
 
@@ -66,11 +67,12 @@ class DecisionRecord:
     machine_value: float
     override_value: float
     reconciler_value: float
-    final_value: float
+    final_value: float          # what planner actually submitted
     reason_text: str
     reason_class: str
     decision_maker: str
-    context_json: dict
+    context_json: dict          # full snapshot: all signals + memory context
+    # These are None at write time — filled in when actuals arrive:
     outcome: Optional[float] = None
     machine_error: Optional[float] = None
     override_error: Optional[float] = None
