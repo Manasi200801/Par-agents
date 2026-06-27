@@ -40,6 +40,7 @@ app = FastAPI(title="Compass Pipeline API")
 
 @app.on_event("startup")
 def startup():
+    os.makedirs("data", exist_ok=True)
     init_db()
 
 app.add_middleware(
