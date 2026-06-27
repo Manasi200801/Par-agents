@@ -5,6 +5,14 @@ Compass header, top-right workspace navigation, and routing between views.
 """
 from __future__ import annotations
 
+import os
+import sys
+
+# Ensure the project root (Par-agents/) is on sys.path so that
+# `from app.views.X import ...` works regardless of which directory
+# Streamlit adds to sys.path when executing this script.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import streamlit as st
 
 from app.views.live_decision import render as render_live_decision
