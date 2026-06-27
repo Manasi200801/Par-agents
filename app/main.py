@@ -329,6 +329,32 @@ LIGHT_VIEW_OVERRIDES = """
     .memory-track { background: rgba(0,0,0,.08) !important; }
     .memory-stat { background: rgba(0,0,0,.03) !important; border-color: rgba(99,131,179,.15) !important; }
     .memory-stat-label { color: #4d6278 !important; }
+    .memory-stat-value { color: #0d1b2e !important; }
+
+    /* ── Streamlit native widgets ── */
+    /* Radio option label text */
+    div[data-testid="stRadio"] [role="radiogroup"] label {
+        color: #0d1b2e !important;
+    }
+    /* Metric widget values */
+    [data-testid="stMetricValue"] > div { color: #0d1b2e !important; }
+    [data-testid="stMetricLabel"] > div { color: #4d6278 !important; }
+    [data-testid="stMetricDelta"] { color: #059669 !important; }
+    /* Select / date input native widgets */
+    [data-baseweb="select"] [data-baseweb="select-option"],
+    [data-baseweb="select"] > div,
+    [data-baseweb="input"] > div {
+        background: #ffffff !important;
+        color: #0d1b2e !important;
+    }
+    [data-baseweb="select"] svg { color: #4d6278 !important; }
+    /* Slider */
+    [data-testid="stSlider"] [data-baseweb="slider"] div[role="slider"] {
+        background: var(--violet) !important;
+    }
+    /* Section headings rendered as plain HTML */
+    .stMarkdown h2, .stMarkdown h3 { color: #0d1b2e !important; }
+    p, li { color: #1e3a52; }
 </style>
 """
 

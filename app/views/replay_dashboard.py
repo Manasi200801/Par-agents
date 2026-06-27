@@ -899,6 +899,8 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
         ),
     ]
 
+    marker_outline = "rgba(7,17,28,.85)" if dark_mode else "rgba(240,248,255,.85)"
+
     for name, column, color, dash, width in trace_specs:
         fig.add_trace(
             go.Scatter(
@@ -918,7 +920,7 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
                     color=color,
                     line=dict(
                         width=1,
-                        color="rgba(7,17,28,.85)",
+                        color=marker_outline,
                     ),
                 ),
                 hovertemplate=(
@@ -936,6 +938,18 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
         - float(latest["mae_compass"])
     )
 
+    ann_bg     = "rgba(25,20,52,.96)"     if dark_mode else "rgba(245,248,255,.97)"
+    ann_border = "rgba(167,139,250,.55)"  if dark_mode else "rgba(109,40,217,.35)"
+    ann_color  = "#E9E2FF"                if dark_mode else "#6d28d9"
+    plot_bg    = "rgba(10,20,33,.70)"     if dark_mode else "rgba(237,247,255,.60)"
+    font_color = "#DCE4EF"                if dark_mode else "#0d1b2e"
+    axis_label = "#8494A8"                if dark_mode else "#4d6278"
+    axis_tick  = "#A6B2C3"                if dark_mode else "#4d6278"
+    grid_x     = "rgba(148,171,202,.055)" if dark_mode else "rgba(99,131,179,.14)"
+    grid_y     = "rgba(148,171,202,.095)" if dark_mode else "rgba(99,131,179,.18)"
+    hover_bg   = "#111A28"                if dark_mode else "#ffffff"
+    hover_text = "#F4F7FB"                if dark_mode else "#0d1b2e"
+
     fig.add_annotation(
         x=latest["period_label"],
         y=float(latest["mae_compass"]),
@@ -944,30 +958,19 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
         arrowhead=2,
         ax=-82,
         ay=-38,
-        bgcolor="rgba(25,20,52,.96)",
-        bordercolor="rgba(167,139,250,.55)",
+        bgcolor=ann_bg,
+        bordercolor=ann_border,
         borderwidth=1,
         borderpad=7,
-        font=dict(
-            color="#E9E2FF",
-            size=11,
-        ),
+        font=dict(color=ann_color, size=11),
     )
 
     fig.update_layout(
         height=440,
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(10,20,33,.70)",
-        font=dict(
-            color="#DCE4EF",
-            family="Inter, Segoe UI, sans-serif",
-        ),
-        margin=dict(
-            l=35,
-            r=25,
-            t=18,
-            b=30,
-        ),
+        plot_bgcolor=plot_bg,
+        font=dict(color=font_color, family="Inter, Segoe UI, sans-serif"),
+        margin=dict(l=35, r=25, t=18, b=30),
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -979,46 +982,28 @@ def render(force_fallback: bool = False, dark_mode: bool = True) -> None:
         ),
         hovermode="x unified",
         hoverlabel=dict(
-            bgcolor="#111A28",
+            bgcolor=hover_bg,
             bordercolor="rgba(148,171,202,.28)",
-            font=dict(
-                color="#F4F7FB",
-                size=12,
-            ),
+            font=dict(color=hover_text, size=12),
         ),
     )
 
     fig.update_xaxes(
         title_text=frequency,
-        title_font=dict(
-            color="#8494A8",
-            size=11,
-        ),
-        tickfont=dict(
-            color="#A6B2C3",
-            size=11,
-        ),
-        gridcolor="rgba(148,171,202,.055)",
+        title_font=dict(color=axis_label, size=11),
+        tickfont=dict(color=axis_tick, size=11),
+        gridcolor=grid_x,
         nticks=min(len(aggregated), 10),
         fixedrange=True,
     )
 
     fig.update_yaxes(
         title_text="Forecast error",
-        title_font=dict(
-            color="#8494A8",
-            size=11,
-        ),
-        tickfont=dict(
-            color="#A6B2C3",
-            size=11,
-        ),
-        gridcolor="rgba(148,171,202,.095)",
+        title_font=dict(color=axis_label, size=11),
+        tickfont=dict(color=axis_tick, size=11),
+        gridcolor=grid_y,
         zeroline=False,
-        range=[
-            y_min - y_padding,
-            y_max + y_padding,
-        ],
+        range=[y_min - y_padding, y_max + y_padding],
         tickformat=",",
         fixedrange=True,
     )
