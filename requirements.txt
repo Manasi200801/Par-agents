@@ -6,3 +6,5 @@ streamlit
 plotly
 sentence-transformers
 python-dotenv
+numpy
+pytest

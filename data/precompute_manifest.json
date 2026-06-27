@@ -1,0 +1,12 @@
+{
+  "source_tables": 26,
+  "hierarchy_rows": 17952,
+  "fva_rows": 68126,
+  "fva_cutoffs": 23,
+  "outputs": [
+    "data/compass.duckdb",
+    "data/fva_base.parquet",
+    "data/replay_chart_cache.parquet",
+    "data/headline_stats.json"
+  ]
+}
