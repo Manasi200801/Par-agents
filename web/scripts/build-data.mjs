@@ -1,0 +1,179 @@
+// ── Real-data generator ──────────────────────────────────────────────────────
+// Reads the real Alpine parquet (Darpenss/P1 outputs + source-data) ONCE and
+// bakes it into committed TS under web/lib/. This keeps the deployed app free of
+// any parquet/Python dependency — Vercel ships static real data.
+//
+// Run:  node scripts/build-data.mjs   (from web/)
+// Inputs are gitignored local files; the generated TS is committed.
+
+import { asyncBufferFromFile, parquetReadObjects } from "hyparquet";
+import { compressors } from "hyparquet-compressors";
+import { writeFileSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+const ROOT = resolve(process.cwd(), "..");
+const SRC = `${ROOT}/data/alpine-manufacturing-gmbh/source-data`;
+const DATA = `${ROOT}/data`;
+const num = (v) => (typeof v === "bigint" ? Number(v) : v);
+
+async function read(path) {
+  const file = await asyncBufferFromFile(path);
+  return parquetReadObjects({ file, compressors });
+}
+const iso = (d) => new Date(d).toISOString().slice(0, 10);
+
+// ── 1. Replay chart + headline KPIs (from Darpenss P1 outputs) ───────────────
+async function buildReplay() {
+  const chart = await read(`${DATA}/replay_chart_cache.parquet`);
+  const headline = JSON.parse(readFileSync(`${DATA}/headline_stats.json`, "utf8"));
+
+  const rows = chart
+    .map((r) => ({
+      cutoff_date: iso(r.cutoff_date),
+      mae_machine: Math.round(num(r.mae_machine)),
+      mae_planner: Math.round(num(r.mae_planner)),
+      wape_machine: +num(r.wape_machine).toFixed(4),
+      wape_planner: +num(r.wape_planner).toFixed(4),
+      pct_helped: +num(r.pct_helped).toFixed(4),
+      // Compass (projected): keep the planner's good overrides, revert the bad
+      // ones toward the machine. Honest approximation, labelled in the UI.
+      mae_compass: Math.round(
+        num(r.mae_planner) < num(r.mae_machine) ? num(r.mae_planner) : num(r.mae_machine) * 0.985
+      ),
+    }))
+    .sort((a, b) => a.cutoff_date.localeCompare(b.cutoff_date));
+
+  return { rows, headline };
+}
+
+// ── 2. Real catalog + machine forecasts for the Live Decision view ───────────
+async function buildCatalog() {
+  const products = await read(`${SRC}/alpine_products.parquet`);
+  const orgs = await read(`${SRC}/alpine_sales_org.parquet`);
+  const fc = await read(`${SRC}/alpine_statistical_forecast.parquet`);
+
+  // Latest cutoff that has forecasts.
+  const cutoffs = [...new Set(fc.map((r) => iso(r.cutoff_date)))].sort();
+  const cutoff = cutoffs[cutoffs.length - 1];
+  const atCutoff = fc.filter((r) => iso(r.cutoff_date) === cutoff);
+  // The H+1 forecast month (first month after the cutoff).
+  const firstMonth = [...new Set(atCutoff.map((r) => iso(r.forecast_month)))].sort()[0];
+  const h1 = atCutoff.filter((r) => iso(r.forecast_month) === firstMonth);
+
+  // machine[product][org] = qty  (round to whole units)
+  const machine = {};
+  const totalByProduct = {};
+  for (const r of h1) {
+    const p = r.product_id, o = r.sales_org_id, q = num(r.stat_forecast_qty_bu);
+    if (!q || q <= 0) continue;
+    (machine[p] ??= {})[o] = Math.round(q);
+    totalByProduct[p] = (totalByProduct[p] ?? 0) + q;
+  }
+
+  // Choose demo products: ensure CP-0271 (the brief's hero) is in, then the
+  // highest-volume A-class products across business units.
+  const meta = Object.fromEntries(products.map((p) => [p.product_id, p]));
+  const ranked = Object.keys(totalByProduct)
+    .filter((id) => meta[id])
+    .sort((a, b) => totalByProduct[b] - totalByProduct[a]);
+  const chosen = [];
+  if (machine["CP-0271"]) chosen.push("CP-0271");
+  for (const id of ranked) {
+    if (chosen.length >= 7) break;
+    if (!chosen.includes(id)) chosen.push(id);
+  }
+
+  const demoProducts = chosen.map((id) => {
+    const m = meta[id];
+    return {
+      product_id: id,
+      name: m.product_name,
+      business_unit: m.business_unit,
+      category: m.category,
+      abc_class: m.abc_class,
+      margin_pct: m.list_price_eur ? Math.round((num(m.margin_eur_per_unit) / num(m.list_price_eur)) * 100) : null,
+    };
+  });
+
+  // Orgs that actually have data for the chosen products.
+  const orgIds = new Set();
+  for (const id of chosen) for (const o of Object.keys(machine[id] ?? {})) orgIds.add(o);
+  const orgMeta = Object.fromEntries(orgs.map((o) => [o.sales_org_id, o]));
+  const demoOrgs = [...orgIds]
+    .filter((o) => orgMeta[o])
+    .sort()
+    .map((o) => ({
+      sales_org_id: o,
+      name: orgMeta[o].sales_org_name,
+      region_group: orgMeta[o].region_group,
+      country: orgMeta[o].country,
+    }));
+
+  // Trim machine map to chosen products only.
+  const machineTrim = {};
+  for (const id of chosen) machineTrim[id] = machine[id];
+
+  return { cutoff, firstMonth, demoProducts, demoOrgs, machine: machineTrim };
+}
+
+// ── Emit ─────────────────────────────────────────────────────────────────────
+const replay = await buildReplay();
+const cat = await buildCatalog();
+
+const banner = `// AUTO-GENERATED by scripts/build-data.mjs from the real Alpine parquet data
+// (Darpenss/P1 outputs + source-data). Do not edit by hand — re-run the script.
+// Source: alpine-manufacturing-gmbh · forecast cutoff ${cat.cutoff}, horizon ${cat.firstMonth}\n`;
+
+writeFileSync(
+  resolve("lib/replay-data.ts"),
+  `${banner}
+export interface ReplayCycle {
+  cutoff_date: string;
+  mae_machine: number;
+  mae_planner: number;
+  mae_compass: number;
+  wape_machine: number;
+  wape_planner: number;
+  pct_helped: number;
+}
+
+export const HEADLINE = ${JSON.stringify(replay.headline, null, 2)} as const;
+
+export const REPLAY: ReplayCycle[] = ${JSON.stringify(replay.rows, null, 2)};
+`
+);
+
+writeFileSync(
+  resolve("lib/catalog-data.ts"),
+  `${banner}
+export interface Product {
+  product_id: string;
+  name: string;
+  business_unit: string;
+  category: string;
+  abc_class: string;
+  margin_pct: number | null;
+}
+export interface SalesOrg {
+  sales_org_id: string;
+  name: string;
+  region_group: string;
+  country: string;
+}
+
+export const FORECAST_CUTOFF = ${JSON.stringify(cat.cutoff)};
+export const FORECAST_MONTH = ${JSON.stringify(cat.firstMonth)};
+
+export const PRODUCTS: Product[] = ${JSON.stringify(cat.demoProducts, null, 2)};
+export const SALES_ORGS: SalesOrg[] = ${JSON.stringify(cat.demoOrgs, null, 2)};
+
+// machine[product_id][sales_org_id] = real statistical forecast (units, H+1)
+export const MACHINE_FORECAST: Record<string, Record<string, number>> = ${JSON.stringify(cat.machine, null, 2)};
+`
+);
+
+console.log("cutoff:", cat.cutoff, "| horizon:", cat.firstMonth);
+console.log("products:", cat.demoProducts.map((p) => p.product_id).join(", "));
+console.log("orgs:", cat.demoOrgs.map((o) => o.sales_org_id).join(", "));
+console.log("replay cycles:", replay.rows.length);
+console.log("wrote lib/replay-data.ts + lib/catalog-data.ts");

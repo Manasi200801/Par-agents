@@ -1,0 +1,315 @@
+@import "tailwindcss";
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Compass — Linear dark design system
+   Tokens lifted verbatim from DESIGN-LINEAR.md. 8px base grid, exact hex.
+   ─────────────────────────────────────────────────────────────────────────── */
+@theme {
+  /* Background surfaces */
+  --color-canvas: #08090a; /* deepest background */
+  --color-panel: #0f1011; /* sidebar / panel backgrounds */
+  --color-surface: #151618; /* elevated card background */
+  --color-surface-2: #1d1f22; /* hover / nested surface */
+
+  /* Text & content */
+  --color-ink: #f7f8f8; /* primary, near-white */
+  --color-ink-2: #d0d6e0; /* secondary, silver-gray */
+  --color-ink-3: #8a8f98; /* tertiary, muted */
+  --color-ink-4: #5b606b; /* faintest, captions */
+
+  /* Brand & accent */
+  --color-brand: #5e6ad2; /* primary CTA */
+  --color-brand-2: #7170ff; /* links / active */
+  --color-brand-3: #828fff; /* hover */
+
+  /* Semantic — agent signal directions / confidence */
+  --color-support: #4cb782; /* supports_override */
+  --color-caution: #e2a33c; /* contradicts_override */
+  --color-danger: #d2545a; /* low confidence / risk */
+
+  /* Lines */
+  --color-line: rgba(255, 255, 255, 0.08); /* standard */
+  --color-line-soft: rgba(255, 255, 255, 0.05); /* subtle default */
+  --color-line-strong: rgba(255, 255, 255, 0.13); /* focus / emphasis */
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --radius-card: 12px;
+  --radius-ctrl: 8px;
+}
+
+/* ── Light theme overrides ────────────────────────────────────────────────── */
+/* Applied when <html data-theme="light">. Keeps the same token NAMES so every
+   component restyles automatically. A clean, neutral light palette tuned to sit
+   beside the indigo brand. */
+html[data-theme="light"] {
+  --color-canvas: #f6f7f9;
+  --color-panel: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-2: #f0f2f5;
+  --color-ink: #11151b;
+  --color-ink-2: #36404c;
+  --color-ink-3: #69727e;
+  --color-ink-4: #98a1ac;
+  --color-brand: #5e6ad2;
+  --color-brand-2: #4d59c4;
+  --color-brand-3: #4853bd;
+  --color-support: #2f9e63;
+  --color-caution: #b9791f;
+  --color-danger: #c5474d;
+  --color-line: rgba(13, 18, 26, 0.1);
+  --color-line-soft: rgba(13, 18, 26, 0.06);
+  --color-line-strong: rgba(13, 18, 26, 0.16);
+  color-scheme: light;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+html {
+  background: var(--color-canvas);
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv01", "ss03"; /* Linear's Inter feature set */
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* Engineered graph-paper grid + one low atmospheric glow for depth.
+     Not decoration — a precision cue. Lines align to the 8px base (32px cells). */
+  background-image:
+    radial-gradient(
+      900px 480px at 72% -12%,
+      rgba(94, 106, 210, 0.1),
+      transparent 70%
+    ),
+    linear-gradient(var(--color-line-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-line-soft) 1px, transparent 1px);
+  background-size: 100% 100%, 32px 32px, 32px 32px;
+  background-position: 0 0, 0 0, 0 0;
+  background-attachment: fixed;
+}
+
+/* Tabular numerals for every data figure — forecasts must line up. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "cv01", "ss03";
+}
+
+/* ── Focus ────────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-brand-2);
+  outline-offset: 2px;
+}
+
+/* ── Surfaces ─────────────────────────────────────────────────────────────── */
+.panel {
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+}
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  box-shadow: rgba(0, 0, 0, 0.4) 0 2px 4px;
+}
+
+/* ── Section index labels (01 · CONTEXT) ──────────────────────────────────── */
+.eyebrow {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.eyebrow .idx {
+  color: var(--color-brand-2);
+  margin-right: 2px;
+}
+
+/* ── Controls ─────────────────────────────────────────────────────────────── */
+.input,
+.select {
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-ctrl);
+  color: var(--color-ink);
+  font-size: 14px;
+  font-family: inherit;
+  padding: 9px 12px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.input::placeholder {
+  color: var(--color-ink-4);
+}
+.input:hover,
+.select:hover {
+  border-color: var(--color-line-strong);
+}
+.input:focus,
+.select:focus {
+  border-color: var(--color-brand);
+  outline: none;
+  background: var(--color-surface-2);
+}
+textarea.input {
+  resize: vertical;
+  min-height: 76px;
+  line-height: 1.5;
+}
+
+.select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%238a8f98' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+  cursor: pointer;
+}
+.select option {
+  background: var(--color-panel);
+  color: var(--color-ink);
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--radius-ctrl);
+  padding: 10px 16px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease,
+    transform 0.06s ease, opacity 0.15s ease;
+  user-select: none;
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--color-brand);
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    rgba(0, 0, 0, 0.4) 0 1px 3px;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-brand-3);
+}
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--color-ink-2);
+  border-color: var(--color-line);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--color-line-strong);
+}
+
+/* ── Chips / badges ───────────────────────────────────────────────────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--color-line);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--color-ink-2);
+}
+
+/* ── Segmented confidence / strength meter ────────────────────────────────── */
+.seg {
+  display: inline-flex;
+  gap: 3px;
+}
+.seg > i {
+  width: 18px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-line-strong);
+  display: block;
+}
+
+/* ── Direction accent bar on agent cards ──────────────────────────────────── */
+.accent {
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+}
+
+/* ── Animations ───────────────────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fade-up {
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -300px 0;
+  }
+  100% {
+    background-position: 300px 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface) 0%,
+    var(--color-surface-2) 50%,
+    var(--color-surface) 100%
+  );
+  background-size: 600px 100%;
+  animation: shimmer 1.3s infinite linear;
+  border-radius: var(--radius-card);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spin {
+  animation: spin 0.7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-up,
+  .skeleton,
+  .spin {
+    animation: none;
+  }
+}
+
+/* Reduce the fixed grid on small screens so it doesn't feel busy */
+@media (max-width: 640px) {
+  body {
+    background-size: 100% 100%, 24px 24px, 24px 24px;
+  }
+}
