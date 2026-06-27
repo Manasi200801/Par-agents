@@ -19,11 +19,12 @@ __pycache__/
 .venv/
 venv/
 
-# Database (generated at runtime, not committed)
-data/compass.duckdb
-data/compass.duckdb.wal
+# Database (generated at runtime)
+data/*.duckdb
+data/*.duckdb.wal
 
-# Large parquet source data
+# Large parquet source data (folders, not the directory itself)
 data/alpine-manufacturing-forecast/
 data/alpine-manufacturing-gmbh/
 data/firn-outdoor-ag/
+data/*.parquet
