@@ -1361,7 +1361,7 @@ def _render_agent_card(
 
 
 def _render_memory(memory: MemoryContext | None) -> None:
-    with st.expander("How similar past decisions turned out", expanded=False):
+    with st.expander("How similar past decisions turned out", expanded=True):
         if memory is None:
             st.info("Cold start: no scored history exists for this decision type yet.")
             return
