@@ -1,0 +1,8 @@
+anthropic
+pandas
+pyarrow
+duckdb
+streamlit
+plotly
+sentence-transformers
+python-dotenv
