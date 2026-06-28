@@ -13,6 +13,13 @@ import sys
 # Streamlit adds to sys.path when executing this script.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Load .env so ANTHROPIC_API_KEY is available to os.environ before any check
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 import streamlit as st
 
 from app.views.live_decision import render as render_live_decision
